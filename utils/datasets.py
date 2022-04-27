@@ -48,34 +48,41 @@ class CPDDatasets:
 
         if self.experiments_name == "explosion":
             path_to_data = "data/explosion/"
+            path_to_train_annotaion = path_to_data + "UCF_train_time_markup.txt"
+            path_to_test_annotaion = path_to_data + "UCF_test_time_markup.txt"
+            
         elif self.experiments_name == "road_accidents":
             path_to_data = "data/road_accidents/"
+            path_to_train_annotaion = path_to_data + "UCF_road_train_time_markup.txt"
+            path_to_test_annotaion = path_to_data + "UCF_road_test_time_markup.txt"
 
             # https://pytorch.org/hub/facebookresearch_pytorchvideo_resnet/
 
-            #TODO try another transforms
-            mean = [0.45, 0.45, 0.45]
-            std = [0.225, 0.225, 0.225]
-            side_size = 256
-            crop_size = 256
+        #TODO try another transforms
+        mean = [0.45, 0.45, 0.45]
+        std = [0.225, 0.225, 0.225]
+        side_size = 256
+        crop_size = 256
 
-            transform = Compose([
-                Lambda(lambda x: x / 255.0),
-                NormalizeVideo(mean, std),
-                ShortSideScale(size=side_size),
-                CenterCropVideo(crop_size=(crop_size, crop_size))
-            ])
+        transform = Compose([
+            Lambda(lambda x: x / 255.0),
+            NormalizeVideo(mean, std),
+            ShortSideScale(size=side_size),
+            CenterCropVideo(crop_size=(crop_size, crop_size))
+        ])
 
-            train_dataset = UCFVideoDataset(clip_length_in_frames=16, step_between_clips=5,
-                                            path_to_data=path_to_data,
-                                            path_to_annotation='UCF_train_time_markup.txt',
-                                            video_transform=transform,
-                                            num_workers=0, fps=30, sampler='equal')
-            test_dataset = UCFVideoDataset(clip_length_in_frames=16, step_between_clips=16,
-                                           path_to_data=path_to_data,
-                                           path_to_annotation='UCF_test_time_markup.txt',
-                                           video_transform=transform,
-                                           num_workers=0, fps=30, sampler='downsample_norm')
+        train_dataset = UCFVideoDataset(clip_length_in_frames=16, step_between_clips=5,
+                                        path_to_data=path_to_data,
+                                        path_to_annotation=path_to_train_annotaion,
+                                        video_transform=transform,
+                                        num_workers=0, fps=30, sampler='equal')
+        test_dataset = UCFVideoDataset(clip_length_in_frames=16, step_between_clips=16,
+                                       path_to_data=path_to_data,
+                                       path_to_annotation=path_to_test_annotaion,
+                                       video_transform=transform,
+                                       num_workers=0, fps=30, sampler='downsample_norm')
+            
+        return train_dataset, test_dataset
 
 class UCFVideoDataset(Dataset):
     def __init__(self,
@@ -105,9 +112,9 @@ class UCFVideoDataset(Dataset):
                                                                     self.step_between_clips,
                                                                     self.fps)
         if 'train' in path_to_annotation:
-            path_to_clips = 'train_' + path_to_clips
+            path_to_clips = 'saves/train_' + path_to_clips
         else:
-            path_to_clips = 'test_' + path_to_clips
+            path_to_clips = 'saves/test_' + path_to_clips
 
         if os.path.exists(path_to_clips):
             with open(path_to_clips, 'rb') as clips:
