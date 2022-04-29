@@ -16,7 +16,7 @@ def fix_seeds(seed):
     np.random.seed(seed)
 
 class TCL(nn.Module):
-
+    
     def __init__(self, input_shape, output_shape, has_bias=True) -> None:
 
         super().__init__()
@@ -70,35 +70,17 @@ class TRL(nn.Module):
         chars_outer = string.ascii_lowercase[2*n:2*n+m]
         chars_final = string.ascii_lowercase[2*n+m:2*n+2*m]
 
-        # self.rule_1 = f'{chars_inner},' \
-        #               f'{",".join([i+j for i, j in zip(chars_inner, chars_core)])}' \
-        #               f',{chars_core}{chars_outer}->{chars_outer}'
-        
-        self.rule_1 = f'{chars_inner},' \
-                      f'{",".join([i+j for i, j in zip(chars_inner, chars_core)])}' \
-                      f',{chars_core}{chars_outer},' \
-                      f'{",".join([i+j for i, j in zip(chars_outer, chars_final)])}' \
-                      f'->{chars_final}'
+        self.rule = f'{chars_inner},' \
+                    f'{",".join([i+j for i, j in zip(chars_inner, chars_core)])}' \
+                    f',{chars_core}{chars_outer},' \
+                    f'{",".join([i+j for i, j in zip(chars_outer, chars_final)])}' \
+                    f'->{chars_final}'
 
-        # chars_inner = string.ascii_lowercase[:n]
-        # chars_outer = string.ascii_lowercase[n:n+m]
-        # self.rule_2 = f'{chars_inner},{chars_inner}{chars_outer}->{chars_outer}'
-        self.rule_2 = ""
-
-        # chars_inner = string.ascii_lowercase[:m]
-        # chars_outer = string.ascii_lowercase[m:2*m]
-        # self.rule_3 = f'{chars_inner},' \
-        #               f'{",".join([i+j for i, j in zip(chars_inner, chars_outer)])}' \
-        #               f'->{chars_outer}'
-        self.rule_3 = ""
-
-        print(f'TRL: {self.rule_1, self.rule_2, self.rule_3}')
+        print(f'TRL: {self.rule}')
 
     def forward(self, x) -> torch.Tensor:
 
-        y = torch.einsum(self.rule_1, x, *self.factors_inner, self.core, *self.factors_outer)
-        # y = torch.einsum(self.rule_2, y, self.core)
-        # y = torch.einsum(self.rule_3, y, *self.factors_outer)
+        y = torch.einsum(self.rule, x, *self.factors_inner, self.core, *self.factors_outer)
 
         if self.bias is not None:
             y += self.bias
