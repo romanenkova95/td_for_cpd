@@ -1,4 +1,6 @@
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from models_v2 import TCL
 
 class custom_GRU_cell(nn.Module):
@@ -41,7 +43,7 @@ class custom_GRU_cell(nn.Module):
         return hidden
     
     
-class custom_GRU(torch.nn.Module):
+class custom_GRU(nn.Module):
 
     def __init__(self, input_dim, hidden_dim):
         super().__init__()
@@ -70,44 +72,42 @@ class custom_GRU(torch.nn.Module):
 
 class custom_GRU_cell_TCL(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, input_dims, hidden_dims):
         super().__init__()
         
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-
-        self.linear_w = nn.Linear(self.input_dim, self.hidden_dim*3)
-        self.linear_u = nn.Linear(self.hidden_dim, self.hidden_dim*3, bias=False)
+        self.hidden_dims = hidden_dims
+        self.linear_w = TCL(input_dims, (3,) + hidden_dims, bias=False)
+        self.linear_u = TCL(hidden_dims, (3,) + hidden_dims, bias=False)
         self.activation_zr = nn.Sigmoid()
         self.activation_h = nn.Tanh()
         
         
     def forward(self, x_t, h_prev):
 
-        # x_t shape: N, Hin; h_prev shape: 
-        try:
-            device = x_t.device
-        except:
-            device = 'cpu'
-                
-        x_zrh = self.linear_w(x_t).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-        x_z, x_r, x_h = x_zrh
-        output_z = self.activation_z(self.linear_w_z(x_t) + self.linear_u_z(h_prev))
-        output_r = self.activation_r(self.linear_w_r(x_t) + self.linear_u_r(h_prev))
-        hidden_hat = self.activation_h(self.linear_w_h(x_t) + torch.mul(output_r, self.linear_u_h(h_prev)))
+        # x_t shape: N, Hin; h_prev shape: N, Hout
+
+        N, *input_dims = x_t.shape
         
-        ones = torch.ones_like(output_z).to(device)
-        hidden = torch.mul(output_z, h_prev) + torch.mul((ones - output_z), hidden_hat)
+        x_zrh = self.linear_w(x_t).reshape(N, 3, *self.hidden_dims).transpose(0, 1)
+        x_z, x_r, x_h = x_zrh.unbind(0)   # make torchscript happy (cannot use tensor as tuple)
+
+        h_zrh = self.linear_u(h_prev).reshape(N, 3, *self.hidden_dims).transpose(0, 1)
+        h_z, h_r, h_h = h_zrh.unbind(0)   # make torchscript happy (cannot use tensor as tuple)
+
+        output_z = F.sigmoid(x_z + h_z)
+        output_r = F.sigmoid(x_r + h_r)
+        hidden_hat = F.tanh(x_h + output_r*h_h)
+        hidden = output_z * h_prev + (1 - output_z) * hidden_hat
         
         return hidden
     
     
-class custom_GRU_TCL(torch.nn.Module):
+class custom_GRU_TCL(nn.Module):
 
-    def __init__(self, input_dims, hidden_dims, ranks_u, ranks_h):
+    def __init__(self, input_dims, hidden_dims):
         super().__init__()
         
-        self.cell = custom_GRU_cell_TCL(input_dims, hidden_dims, ranks_u, ranks_h)
+        self.cell = custom_GRU_cell_TCL(input_dims, hidden_dims)
     
     def forward(self, inputs):
 
@@ -119,6 +119,6 @@ class custom_GRU_TCL(torch.nn.Module):
         
         for x_t in inputs:
             out_t = self.cell(x_t, out_t)
-            outputs.append(out_t.squeeze(1).detach().cpu()) # FIXME check squeeze dim
-        outputs = torch.stack(outputs, 1)
-        return outputs, out_t.squeeze(1)
+            outputs.append(out_t.detach().cpu()) # FIXME check squeeze dim
+        outputs = torch.stack(outputs, dim=0)
+        return outputs, out_t
