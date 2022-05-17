@@ -76,7 +76,8 @@ class KLCPDVideo(pl.LightningModule):
         args: dict,
         train_dataset: Dataset,
         test_dataset: Dataset,
-        num_workers: int=2
+        num_workers: int=2,
+        extractor: nn.Module=None
     ) -> None:
 
         super().__init__()        
@@ -84,10 +85,14 @@ class KLCPDVideo(pl.LightningModule):
         self.netG = netG
         self.netD = netD
         
-        # Feature extractor for video datasets
-        self.extractor = torch.hub.load('facebookresearch/pytorchvideo:main', 'x3d_m', pretrained=True)
-        self.extractor = nn.Sequential(*list(self.extractor.blocks[:5]))
-
+        if extractor == None:
+            # Feature extractor for video datasets
+            self.extractor = torch.hub.load('facebookresearch/pytorchvideo:main', 'x3d_m', pretrained=True)
+            self.extractor = nn.Sequential(*list(self.extractor.blocks[:5]))
+        else:
+            self.extractor = extractor
+ 
+            
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
 

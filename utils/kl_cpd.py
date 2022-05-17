@@ -11,7 +11,7 @@ from typing import List, Tuple
 
 
 # --------------------------------------------------------------------------------------#
-#                                          Loss                                        #
+#                                          Loss                                         #
 # --------------------------------------------------------------------------------------#
 
 def median_heuristic(med_sqdist, beta=0.5):
@@ -313,11 +313,11 @@ def get_klcpd_output_2(kl_cpd_model, batch, window):
         curr_future = kl_cpd_model.extractor(batch_future_slices[i]).transpose(1, 2).flatten(2)
         curr_future, _ = kl_cpd_model.netD(curr_future.to(torch.float32))
 
+        curr_history, curr_future = [Xi.reshape(*Xi.shape[:2], -1) for Xi in [curr_history, curr_future]]
         mmd_scores = batch_mmd2_loss(curr_history, curr_future, sigma_var)
         zeros[:, 2 * window - 1:] = mmd_scores
         pred_out.append(zeros)
     pred_out = torch.cat(pred_out).to(kl_cpd_model.device)
     #TODO check
     pred_out = torch.tanh(pred_out * 10 ** 7)
-
     return pred_out
