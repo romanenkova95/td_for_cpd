@@ -22,7 +22,11 @@ args = {}
 block_type = "tcl3d"
 bias = "all"
 
+args["seed"] = 102
 args["block_type"] = block_type
+args["bias"] = bias
+args["epochs"] = 30
+
 args['wnd_dim'] = 4 # 8
 args['batch_size'] = 8
 args['lr'] = 1e-4
@@ -37,36 +41,36 @@ args['window_1'] = 4 # 8
 args['window_2'] = 4 # 8
 args['sqdist'] = 50
 
-if block_type == "tcl3d":
+if args["block_type"] == "tcl3d":
     # For TCL3D
     args['data_dim'] = (192, 8, 8)
-    args['RNN_hid_dim'] = (32, 8, 8) # 3072
-    args['emb_dim'] = (64, 8, 8) # 3072
-    args['bias_rank'] = 8
+    args['RNN_hid_dim'] = (16, 4, 4) # 3072
+    args['emb_dim'] = (32, 8, 8) # 3072
+    args['bias_rank'] = 4
     
-elif block_type == "tcl":
+elif args["block_type"] == "tcl":
     # For TCL
     args['data_dim'] = (192, 8, 8)
     args['RNN_hid_dim'] = (64, 8, 8) # 3072
     args['emb_dim'] = (64, 8, 8) # 3072
 
-elif block_type == "linear":
+elif args["block_type"] == "linear":
     # For Linear
     args['data_dim'] = 12288
     args['RNN_hid_dim'] = 128 # 3072
     args['emb_dim'] = 256 # 3072
 
 
-seed = 0
+seed = args["seed"]
 models.fix_seeds(seed)
 experiments_name = ('explosion')
     
-if block_type == "linear":
+if args["block_type"] == "linear":
     netG = nets_original.NetG(args)
     netD = nets_original.NetD(args)
 else:
-    netG = nets_tl.NetG_TL(args, block_type=block_type, bias=bias)
-    netD = nets_tl.NetD_TL(args, block_type=block_type, bias=bias)
+    netG = nets_tl.NetG_TL(args, block_type=args["block_type"], bias=args["bias"])
+    netD = nets_tl.NetD_TL(args, block_type=args["block_type"], bias=args["bias"])
 
 kl_cpd_model = models.KLCPDVideo(netG, netD, args, train_dataset=train_dataset, test_dataset=test_dataset)
 
@@ -81,7 +85,7 @@ for param in kl_cpd_model.extractor.parameters():
     param.requires_grad = False
 
 trainer = pl.Trainer(
-    max_epochs=20, # 100
+    max_epochs=args["epochs"], # 100
     gpus='1',
     # devices='1',
     benchmark=True,
