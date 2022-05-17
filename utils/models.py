@@ -98,8 +98,6 @@ class NetE(nn.Module):
     def forward(self, X) -> torch.Tensor:
         output = []
         for frame_num in range(X.shape[-3]):
-            print(X.shape)
-            ass
             x = nn.ReLU()(self.conv1(X[:, :, frame_num, :, :]))
             x = self.maxpool(nn.ReLU()(self.conv2(x)))
             x = self.flatten(x)
