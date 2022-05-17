@@ -88,6 +88,22 @@ class NetD(nn.Module):
         X_dec = self.relu(self.fc2(X_dec))
         return X_enc, X_dec
 
+class NetE(nn.Module):
+    def __init__(self, args) -> None:
+        super(NetE, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=12, kernel_size=5, stride=2, dilation=2)
+        self.conv2 = nn.Conv2d(in_channels=12, out_channels=6, kernel_size=3, stride=2, dilation=2)
+        self.maxpool = nn.MaxPool2d(3)
+        self.flatten = nn.Flatten()
+    def forward(self, X) -> torch.Tensor:
+        output = []
+        for frame_num in range(X.shape[-3]):
+            x = nn.ReLU()(self.conv1(X[:, :, frame_num, :, :]))
+            x = self.maxpool(nn.ReLU()(self.conv2(x)))
+            x = self.flatten(x)
+            output.append(x)
+        return torch.stack(output, dim=2)
+
 
 #################################################################
 class KLCPDVideo(pl.LightningModule):
