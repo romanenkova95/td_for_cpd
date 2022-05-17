@@ -26,12 +26,7 @@ from pytorchvideo.transforms import (
 class CPDDatasets:
     """Class for experiments' datasets."""
 
-<<<<<<< Updated upstream
     def __init__(self, experiments_name, compress_to = None, random_seed=123) -> None:
-=======
-    def __init__(self, experiments_name,
-                 random_seed=123) -> None:
->>>>>>> Stashed changes
         """Initialize class.
 
         :param experiments_name: type of experiments (only mnist available now!)
@@ -39,17 +34,9 @@ class CPDDatasets:
         """
         super().__init__()
         self.random_seed = random_seed
-<<<<<<< Updated upstream
         self.compress_to = compress_to
         # TODO make
         if experiments_name in ["explosion", "road_accidents"]:
-=======
-        #TODO make
-        if experiments_name in [
-            "explosion",
-            "road_accidents"
-        ]:
->>>>>>> Stashed changes
             self.experiments_name = experiments_name
         else:
             raise ValueError("Wrong experiment_name {}.".format(experiments_name))
