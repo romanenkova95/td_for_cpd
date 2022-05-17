@@ -30,13 +30,15 @@ from pytorchvideo.transforms import (
 class CPDDatasets:
     """Class for experiments' datasets."""
 
-    def __init__(self, experiments_name, random_seed=123) -> None:
+    def __init__(self, experiments_name, compress_to = None, random_seed=123) -> None:
         """Initialize class.
 
         :param experiments_name: type of experiments (only mnist available now!)
+        :param compress_to: compress height to `compress_to` pixels
         """
         super().__init__()
         self.random_seed = random_seed
+        self.compress_to = compress_to
         # TODO make
         if experiments_name in ["explosion", "road_accidents"]:
             self.experiments_name = experiments_name
@@ -63,16 +65,22 @@ class CPDDatasets:
         std = [0.225, 0.225, 0.225]
         side_size = 256
         crop_size = 256
-
-        transform = Compose(
-            [
-                Lambda(lambda x: x / 255.0),
-                Lambda(randomJPEGcompression),
-                NormalizeVideo(mean, std),
-                # ShortSideScale(size=side_size),
-                # CenterCropVideo(crop_size=(crop_size, crop_size))
-            ]
-        )
+        if self.compress_to is None:
+            transform = Compose(
+                [
+                    Lambda(lambda x: x / 255.0),
+                    NormalizeVideo(mean, std),
+                    ShortSideScale(size=side_size),
+                    CenterCropVideo(crop_size=(crop_size, crop_size))
+                ]
+            )
+        else:
+            transform = Compose(
+                [
+                    Lambda(lambda x: x / 255.0),
+                    Lambda(lambda x: randomJPEGcompression(x, self.compress_to)),
+                ]
+            )
 
         train_dataset = UCFVideoDataset(
             clip_length_in_frames=16,
@@ -399,25 +407,15 @@ class UCFVideoDataset(Dataset):
         return sample_idxs
 
 
-def randomJPEGcompression(image):
-    # qf = random.randrange(10, 100)
+def randomJPEGcompression(image, baseheight):
     outputIoStream = BytesIO()
-    # # image_ = image
-    # image_ = transforms.ToPILImage()(image)
-    # image_.save(outputIoStream, "JPEG", quality=qf, optimice=True)
-    # outputIoStream.seek(0)
     dump = []
     for i in range(image.shape[1]):
         image_ = transforms.ToPILImage()(image[:, i, :, :])
-        # image_.save("tmp_before.jpeg")
-        baseheight = 48
         hpercent = baseheight / float(image_.size[1])
         wsize = int((float(image_.size[0]) * float(hpercent)))
         image_ = image_.resize((wsize, baseheight), Image.ANTIALIAS)
-        # image_.save('resized_image.jpg')
-        image_.save(outputIoStream, "JPEG", quality=1, optimice=True)
-        outputIoStream.seek(0)
-        resized = transforms.ToTensor()(Image.open(outputIoStream))
+        resized = transforms.ToTensor()(image_)
         dump.append(resized)
     output = cat(dump).reshape(3, -1, baseheight, wsize)
     return output
