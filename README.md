@@ -6,7 +6,7 @@ You can find list of necessary packages in `environment.yml`.
 
 ## KL-CPD for video.
 
-The training and test process for main model is placed in 'kl-cpd-example-with-test.ipynb' notebook.
+The training and test process for main model is placed in `kl-cpd-example-with-test.ipynb` jupyter notebook.
 
 ## Experiments with Tensor Layer.
 
