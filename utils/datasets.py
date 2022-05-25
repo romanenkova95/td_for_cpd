@@ -4,6 +4,7 @@ import random
 from typing import Tuple
 
 import numpy as np
+import torch
 from io import BytesIO
 from PIL import Image
 from torch.utils.data import Dataset
@@ -13,7 +14,10 @@ from collections import defaultdict
 from torchvision.datasets.video_utils import VideoClips
 from tqdm import tqdm
 import av
+import _pickle as cPickle
 import pickle
+
+# import torch_dct as dct
 
 from torchvision.transforms import Compose, Lambda
 from torchvision.transforms._transforms_video import (
@@ -30,7 +34,7 @@ from pytorchvideo.transforms import (
 class CPDDatasets:
     """Class for experiments' datasets."""
 
-    def __init__(self, experiments_name, compress_to = None, random_seed=123) -> None:
+    def __init__(self, experiments_name, compress_to=None, random_seed=123) -> None:
         """Initialize class.
 
         :param experiments_name: type of experiments (only mnist available now!)
@@ -71,17 +75,39 @@ class CPDDatasets:
                     Lambda(lambda x: x / 255.0),
                     NormalizeVideo(mean, std),
                     ShortSideScale(size=side_size),
-                    CenterCropVideo(crop_size=(crop_size, crop_size))
+                    CenterCropVideo(crop_size=(crop_size, crop_size)),
                 ]
             )
-        else:
+        elif type(self.compress_to) == int:
             transform = Compose(
                 [
                     Lambda(lambda x: x / 255.0),
                     Lambda(lambda x: randomJPEGcompression(x, self.compress_to)),
                 ]
             )
-
+        elif type(self.compress_to) == str and "dct" not in self.compress_to:
+            embeder_name = self.compress_to
+            with open("saves/" + embeder_name + ".pkl", "rb") as f:
+                emb = cPickle.load(f)
+            transform = Compose(
+                [
+                    Lambda(lambda x: x / 255.0),
+                    NormalizeVideo(mean, std),
+                    ShortSideScale(size=side_size),
+                    CenterCropVideo(crop_size=(crop_size, crop_size)),
+                    Lambda(lambda x: manifold_compression(x, emb)),
+                ]
+            )
+        # elif self.compress_to == "dct":
+        #     transform = Compose(
+        #         [
+        #             Lambda(lambda x: x - 128.0),
+        #             Lambda(lambda x: dct.dct_2d(x)),
+        #             NormalizeVideo(mean, std),
+        #             ShortSideScale(size=side_size),
+        #             CenterCropVideo(crop_size=(crop_size, crop_size)),
+        #         ]
+        #     )
         train_dataset = UCFVideoDataset(
             clip_length_in_frames=16,
             step_between_clips=5,
@@ -419,3 +445,14 @@ def randomJPEGcompression(image, baseheight):
         dump.append(resized)
     output = cat(dump).reshape(3, -1, baseheight, wsize)
     return output
+
+
+def manifold_compression(image, emb):
+    tmp = torch.transpose(image, 0, 1)
+    tmp = tmp.reshape(tmp.shape[0], -1)
+    out = emb.transform(tmp)
+    out = out.reshape(
+        1, out.shape[0], int(np.sqrt(emb.n_components)), int(np.sqrt(emb.n_components))
+    )
+    out = torch.tensor(out, dtype=torch.double)
+    return out

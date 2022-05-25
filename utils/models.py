@@ -88,13 +88,23 @@ class NetD(nn.Module):
         X_dec = self.relu(self.fc2(X_dec))
         return X_enc, X_dec
 
+
 class NetE(nn.Module):
     def __init__(self, args) -> None:
         super(NetE, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=12, kernel_size=5, stride=2, dilation=2)
-        self.conv2 = nn.Conv2d(in_channels=12, out_channels=6, kernel_size=3, stride=2, dilation=2)
+        self.conv1 = nn.Conv2d(
+            in_channels=args["in_channels"],
+            out_channels=12,#12
+            kernel_size=5,
+            stride=2,
+            dilation=2,
+        )
+        self.conv2 = nn.Conv2d(#12, 6, 3
+            in_channels=12, out_channels=6, kernel_size=3, stride=2, dilation=2
+        )
         self.maxpool = nn.MaxPool2d(3)
         self.flatten = nn.Flatten()
+
     def forward(self, X) -> torch.Tensor:
         output = []
         for frame_num in range(X.shape[-3]):
@@ -114,23 +124,24 @@ class KLCPDVideo(pl.LightningModule):
         args: dict,
         train_dataset: Dataset,
         test_dataset: Dataset,
-        num_workers: int=2,
-        extractor: nn.Module=None
+        num_workers: int = 2,
+        extractor: nn.Module = None,
     ) -> None:
 
         super().__init__()
         self.args = args
         self.netG = netG
         self.netD = netD
-        
+
         if extractor == None:
             # Feature extractor for video datasets
-            self.extractor = torch.hub.load('facebookresearch/pytorchvideo:main', 'x3d_m', pretrained=True)
+            self.extractor = torch.hub.load(
+                "facebookresearch/pytorchvideo:main", "x3d_m", pretrained=True
+            )
             self.extractor = nn.Sequential(*list(self.extractor.blocks[:5]))
         else:
             self.extractor = extractor
- 
-            
+
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
 
@@ -299,28 +310,6 @@ class KLCPDVideo(pl.LightningModule):
         self.log("val_mmd2_real_D", val_mmd2_real, prog_bar=True)
 
         return val_mmd2_real
-
-    # def test_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
-
-    #     X = batch[0].to(torch.float32)
-    #     X_p, X_f = klcpd._history_future_separation(X, self.args["wnd_dim"])
-
-    #     X_p = self.extractor(X_p.float())
-    #     X_f = self.extractor(X_f.float())
-
-    #     X_p = X_p.transpose(1, 2).flatten(2)  # batch_size, timesteps, C*H*W
-    #     X_f = X_f.transpose(1, 2).flatten(2)  # batch_size, timesteps, C*H*W
-
-    #     X_p_enc, _ = self.netD(X_p)
-    #     X_f_enc, _ = self.netD(X_f)
-
-    #     val_mmd2_real = klcpd.batch_mmd2_loss(
-    #         X_p_enc, X_f_enc, self.sigma_var.to(self.device)
-    #     )
-
-    #     self.log("val_mmd2_real_D", val_mmd2_real, prog_bar=True)
-
-    #     return val_mmd2_real
 
     def configure_optimizers(
         self,
