@@ -24,17 +24,25 @@ class KLCPDVideo(pl.LightningModule):
         args: dict,
         train_dataset: Dataset,
         test_dataset: Dataset,
-        num_workers: int=2
+        num_workers: int=2,
+        extractor: nn.Module=None
     ) -> None:
 
-        super().__init__()        
+        super().__init__()
         self.args = args
         self.netG = netG
         self.netD = netD
         
-        # Feature extractor for video datasets
-        self.extractor = torch.hub.load('facebookresearch/pytorchvideo:main', 'x3d_m', pretrained=True)
-        self.extractor = nn.Sequential(*list(self.extractor.blocks[:5]))
+        if extractor == None:
+            # Feature extractor for video datasets
+            self.extractor = torch.hub.load('facebookresearch/pytorchvideo:main', 'x3d_m', pretrained=True)
+            self.extractor = nn.Sequential(*list(self.extractor.blocks[:5]))
+        else:
+            self.extractor = extractor
+        
+        # # Feature extractor for video datasets
+        # self.extractor = torch.hub.load('facebookresearch/pytorchvideo:main', 'x3d_m', pretrained=True)
+        # self.extractor = nn.Sequential(*list(self.extractor.blocks[:5]))
 
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
@@ -47,6 +55,10 @@ class KLCPDVideo(pl.LightningModule):
         self.window_2 = self.args['window_2']
         
         self.num_workers = num_workers
+
+        self.masked = args["block_type"] == "masked"
+        if self.masked:
+            self.alphaD, self.alphaG = args["alphaD"], args["alphaG"]
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
 
@@ -141,8 +153,13 @@ class KLCPDVideo(pl.LightningModule):
                                               self.args['lambda_ae'], self.args['lambda_real'],
                                               self.sigma_var.to(self.device))
             lossD = (-1) * lossD
-            self.log("train_loss_D", lossD, prog_bar=True)
+            self.log("tlD", lossD, prog_bar=True)
             self.log("train_mmd2_real_D", mmd2_real, prog_bar=True)
+
+            if self.masked:
+                mask_loss_D = self.netD.mask_loss()
+                self.log("mlD", mask_loss_D, prog_bar=True)
+                lossD += self.alphaD * mask_loss_D
             
             #print('train loss D:', lossD)
             
@@ -182,8 +199,13 @@ class KLCPDVideo(pl.LightningModule):
             G_mmd2 = klcpd.batch_mmd2_loss(X_f_enc, Y_f_enc, self.sigma_var.to(self.device))
             
             lossG = G_mmd2.mean()
-            self.log("train_loss_G", lossG, prog_bar=True)
+            self.log("tlG", lossG, prog_bar=True)
             
+            # if self.masked:
+            #     mask_loss_G = self.netG.mask_loss()
+            #     self.log("mlG", mask_loss_G, prog_bar=True)
+            #     lossG += self.alphaG * mask_loss_G
+
             #print('train loss G:', lossG)
             
             return lossG

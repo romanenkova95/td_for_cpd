@@ -9,7 +9,6 @@ from torch.utils.data import DataLoader, Dataset
 import pytorch_lightning as pl
 from typing import List, Tuple
 
-
 # --------------------------------------------------------------------------------------#
 #                                          Loss                                         #
 # --------------------------------------------------------------------------------------#
@@ -293,6 +292,7 @@ def _history_future_separation_test(data, window, step=1):
 
     return history_slices, future_slices
 
+torch.set_printoptions(linewidth=200)
 def get_klcpd_output_2(kl_cpd_model, batch, window):
     batch = batch.to(kl_cpd_model.device)
     if len(batch.shape) <= 4:
@@ -318,10 +318,14 @@ def get_klcpd_output_2(kl_cpd_model, batch, window):
         zeros[:, 2 * window - 1:] = mmd_scores
         pred_out.append(zeros)
     pred_out = torch.cat(pred_out).to(kl_cpd_model.device)
+    # pred_out2 = pred_out[:, 2 * window - 1:].clone().detach().cpu()
+    # breakpoint()
+    # print(f'batch norm: {pred_out2.norm():.3e}\nnorm: {pred_out2.norm(dim=1)}\nmax : {pred_out2.max(dim=1).values}\nmin : {pred_out2.min(dim=1).values}')
     #TODO fix    
-    #pred_out = pred_out / pred_out.max(1).values.expand(pred_out.shape[1], pred_out.shape[0]).transpose(0, 1)    
     #TODO check
-    pred_out = pred_out / pred_out.norm(1, keepdim=True)
+    # pred_out = pred_out / pred_out.norm(dim=1, keepdim=True)
+    #pred_out = torch.softmax(pred_out, dim=1)
     #pred_out = torch.tanh(pred_out)
-    #pred_out = torch.tanh(pred_out * 10 ** 7)
+    # pred_out = torch.tanh(pred_out * 1e4)
+    pred_out = torch.tanh(pred_out * 10 ** 7)
     return pred_out
