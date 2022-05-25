@@ -35,3 +35,14 @@ where TIMESTAMP can be found in model checkpoint name.
 
 ## Experiments with preprocessing
 To train model with custom CNN run `kl-cpd-preprocessing.ipynb` notebook. To run experiments with resizing, run `iterate_compressions.py`
+
+
+## Some Result
+
+### Pruning
+
+Model | Embedding size | Hidden size | \# param, M | F1 | AUC
+-|-|-|-|-|- 
+Original | 100 | 16 | 2.46 | 0.3333 | 1.8753
+Pruned   |  50 | 16 | 1.23 | 0.3000 | 1.0511
+Pruned   |  10 | 16 | 0.25 | 0.2807 | 1.0866
