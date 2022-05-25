@@ -222,7 +222,7 @@ class NetG_TL(nn.Module):
 
 class TCL3D(nn.Module):
     
-    def __init__(self, input_shape, output_shape, bias_rank=1, freeze_modes=None, normalize=True, method="noeinsum") -> None:
+    def __init__(self, input_shape, output_shape, bias_rank=1, freeze_modes=None, normalize=True, method="einsum") -> None:
         super().__init__()
 
         self.freeze_modes = freeze_modes if freeze_modes is not None else []
