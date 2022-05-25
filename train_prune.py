@@ -34,7 +34,7 @@ args = {}
 bias = "all"
 
 args["seed"] = 102
-args["block_type"] = args_local.block_type
+args["block_type"] = "masked"
 args["bias"] = bias
 args["epochs"] = args_local.epochs# if not args_local.dryrun else 1
 args["name"] = args_local.ext_name
@@ -53,7 +53,6 @@ args['window_1'] = 4 # 8
 args['window_2'] = 4 # 8
 args['sqdist'] = 50
 
-args["block_type"] = "masked"
 args['data_dim'] = 12288
 args['RNN_hid_dim'] = 16
 args['emb_dim'] = 100
@@ -131,4 +130,4 @@ trainer = pl.Trainer(
 trainer.fit(kl_cpd_model)
 
 if not args_local.dryrun:
-    torch.save({"checkpoint": kl_cpd_model.state_dict(), "args": args}, f'saves/models/model_{args_local["ext_name"]}_tl_9{args_local["timestamp"]}.pth')
+    torch.save({"checkpoint": kl_cpd_model.state_dict(), "args": args}, f'saves/models/model_{args_local.ext_name}_tl_{int(time.time())}.pth')
