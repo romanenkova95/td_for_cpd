@@ -318,6 +318,10 @@ def get_klcpd_output_2(kl_cpd_model, batch, window):
         zeros[:, 2 * window - 1:] = mmd_scores
         pred_out.append(zeros)
     pred_out = torch.cat(pred_out).to(kl_cpd_model.device)
+    #TODO fix    
+    #pred_out = pred_out / pred_out.max(1).values.expand(pred_out.shape[1], pred_out.shape[0]).transpose(0, 1)    
     #TODO check
-    pred_out = torch.tanh(pred_out * 10 ** 7)
+    pred_out = pred_out / pred_out.norm(1, keepdim=True)
+    #pred_out = torch.tanh(pred_out)
+    #pred_out = torch.tanh(pred_out * 10 ** 7)
     return pred_out
