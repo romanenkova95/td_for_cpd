@@ -307,10 +307,10 @@ def get_klcpd_output_2(kl_cpd_model, batch, window):
     for i in range(len(batch_history_slices)):
         zeros = torch.zeros(1, seq_len)
 
-        curr_history = kl_cpd_model.extractor(batch_history_slices[i]).transpose(1, 2).flatten(2)
+        curr_history = kl_cpd_model.extractor(batch_history_slices[i].to(torch.float32)).transpose(1, 2).flatten(2)
         curr_history, _ = kl_cpd_model.netD(curr_history.to(torch.float32))
 
-        curr_future = kl_cpd_model.extractor(batch_future_slices[i]).transpose(1, 2).flatten(2)
+        curr_future = kl_cpd_model.extractor(batch_future_slices[i].to(torch.float32)).transpose(1, 2).flatten(2)
         curr_future, _ = kl_cpd_model.netD(curr_future.to(torch.float32))
 
         curr_history, curr_future = [Xi.reshape(*Xi.shape[:2], -1) for Xi in [curr_history, curr_future]]
