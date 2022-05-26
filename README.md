@@ -6,6 +6,10 @@ KL-CPD, a novel kernel learning framework for time series CPD that optimizes a l
 
 You can find list of necessary packages in `environment.yml`.
 
+## Download Data
+
+Download video data archieve from [here](https://drive.google.com/file/d/1r3HKjW1Y4qXpCfUBsEGmHgC48k08llOW/view?usp=sharing) and put videos into `data/exploion` folder.
+
 ## KL-CPD for video.
 
 The training and test process for main model is placed in `kl-cpd-example-with-test.ipynb` jupyter notebook.
