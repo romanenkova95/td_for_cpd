@@ -18,7 +18,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Test your model')
 parser.add_argument("--ext-name", type=str, default="x3d_m", help='name of extractor model')
-parser.add_argument("--epochs", type=int, default=1, help='Max number of epochs to train')
+parser.add_argument("--epochs", type=int, default=51, help='Max number of epochs to train')
 parser.add_argument("--val-every-n-epochs", type=int, default=50, help='Validate every M epochs')
 parser.add_argument("-q", type=float, default=0.5, help='Ratio of pruned channels')
 parser.add_argument("--emb-dim", type=str, default="32,8,8", help='GRU embedding dim')
