@@ -19,6 +19,7 @@ import argparse
 parser = argparse.ArgumentParser(description='Test your model')
 parser.add_argument("--ext-name", type=str, default="x3d_m", help='name of extractor model')
 parser.add_argument("--epochs", type=int, default=1, help='Max number of epochs to train')
+parser.add_argument("--val-every-n-epochs", type=int, default=50, help='Validate every M epochs')
 parser.add_argument("-q", type=float, default=0.5, help='Ratio of pruned channels')
 parser.add_argument("--emb-dim", type=str, default="32,8,8", help='GRU embedding dim')
 parser.add_argument("--hid-dim", type=str, default="16,4,4", help='GRU hidden dim')
@@ -58,6 +59,7 @@ args['RNN_hid_dim'] = 16
 args['emb_dim'] = 100
 args["alphaD"] = 1e-3
 args["alphaG"] = 0.
+args["val_every_n_epochs"] = args_local.val_every_n_epochs if not args_local.dryrun else 1
 
 print(f'Args: {args}')
 
@@ -96,7 +98,7 @@ trainer = pl.Trainer(
     gpus='1',
     # devices='1',
     benchmark=True,
-    check_val_every_n_epoch=1,
+    check_val_every_n_epoch=args["val_every_n_epochs"],
     gradient_clip_val=args['grad_clip'],
     logger=logger,
     callbacks=early_stop_callback
@@ -117,7 +119,7 @@ kl_cpd_model.netD.mask2[0, 0] = (l1_norm > median) * 1.
 args["alphaD"], args["alphaG"] = 0, 0
 
 trainer = pl.Trainer(
-    max_epochs=5, # 100
+    max_epochs=args["epochs"], # 100
     gpus='1',
     # devices='1',
     benchmark=True,
