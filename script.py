@@ -34,7 +34,7 @@ args_local = parser.parse_args()
 
 experiments_name = args_local.experiments_name
 if not args_local.dryrun:
-    timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%y%m%dT%H%M%S")
     save_path = Path("saves/models") / experiments_name
     save_path.mkdir(parents=True, exist_ok=True)
     save_path = save_path / f'model_{args_local.ext_name}_tl_{timestamp}.pth'
