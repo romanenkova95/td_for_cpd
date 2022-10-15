@@ -1,4 +1,5 @@
-from typing import List, Tuple
+from collections import defaultdict
+from typing import List, Tuple, Optional
 
 import numpy as np
 import torch
@@ -7,6 +8,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import gc
 import utils.kl_cpd as klcpd
+from time import time
 
 
 def find_first_change(mask):    
@@ -61,12 +63,15 @@ def calculate_metrics(true_labels, predictions):
     return TN, FP, FN, TP, FP_delay, delay, cover
 
 ##########################################
-def get_models_predictions(inputs, labels, model, model_type='seq2seq', subseq_len=None, device='cuda'):
+# def get_models_predictions(inputs, labels, model, model_type='seq2seq', subseq_len=None, device='cuda'):
+def get_models_predictions(inputs, labels, model, model_type='seq2seq', subseq_len=None, device='cuda', scales=None):
 
     inputs = inputs.to(device)
     true_labels = labels.to(device)
-    outs = klcpd.get_klcpd_output_2(model, inputs, model.window_1)
-    return outs, true_labels
+    # outs = klcpd.get_klcpd_output_2(model, inputs, model.window_1, scales)
+    # return outs, true_labels
+    outs_list = klcpd.get_klcpd_output_2(model, inputs, model.window_1, scales)
+    return outs_list, true_labels
 
 def evaluate_metrics_on_set(
     model: nn.Module,
@@ -75,7 +80,8 @@ def evaluate_metrics_on_set(
     verbose: bool = True,
     model_type: str = 'seq2seq',
     subseq_len: int = None, 
-    device: str = 'cuda'
+    device: str = 'cuda',
+    scales: Optional[List]= None
 ) -> Tuple[int, int, int, int, float, float]:
     """Calculate metrics for CPD.
     """
@@ -83,59 +89,76 @@ def evaluate_metrics_on_set(
     model.eval()
     model.to(device)    
     
-    FP_delays = []
-    delays = []
-    covers = []
-    TN, FP, FN, TP = (0, 0, 0, 0)
+    n_scales = len(scales)
+    FP_delays, delays, covers = [defaultdict(list) for _ in range(3)]
+    TN, FP, FN, TP = [np.zeros(n_scales) for _ in range(4)]
     
+    t_forward, t_metric = 0, 0
     with torch.no_grad():
             
         for test_inputs, test_labels in test_loader:
-            test_out, test_labels = get_models_predictions(test_inputs, test_labels, 
+            t0 = time()
+            # test_out, test_labels = get_models_predictions(test_inputs, test_labels, 
+            test_out_list, test_labels = get_models_predictions(test_inputs, test_labels, 
                                                            model, 
                                                            model_type=model_type, 
-                                                           subseq_len=subseq_len, 
-                                                           device=device)
+                                                           subseq_len=subseq_len,
+                                                           device=device,
+                                                           scales=scales)
 
-            try:
-                test_out = test_out.squeeze(2)
-            except:
+            t1 = time()
+
+            for t, (scale, test_out) in enumerate(zip(scales, test_out_list)):
                 try:
-                    test_out = test_out.squeeze(1)
+                    test_out = test_out.squeeze(2)
                 except:
-                    test_out = test_out
+                    try:
+                        test_out = test_out.squeeze(1)
+                    except:
+                        test_out = test_out
 
-            tn, fp, fn, tp, FP_delay, delay, cover = calculate_metrics(test_labels, test_out > threshold)     
+                tn, fp, fn, tp, FP_delay, delay, cover = calculate_metrics(test_labels, test_out > threshold)     
+
+                del test_out
+                gc.collect()
+                if 'cuda' in device:
+                    torch.cuda.empty_cache() 
+
+                TN[t] += tn
+                FP[t] += fp
+                FN[t] += fn
+                TP[t] += tp
+                
+                # FIXME change `scale` to `t`
+                FP_delays[scale].append(FP_delay.detach().cpu())
+                delays[scale].append(delay.detach().cpu())
+                covers[scale].extend(cover)
 
             del test_labels
-            del test_out
-            gc.collect()
-            if 'cuda' in device:
-                torch.cuda.empty_cache() 
+            t2 = time()
 
-            TN += tn
-            FP += fp
-            FN += fn
-            TP += tp
-            
-            FP_delays.append(FP_delay.detach().cpu())
-            delays.append(delay.detach().cpu())
-            covers.extend(cover)
+            t_forward += t1 - t0
+            t_metric  += t2 - t1
 
-                        
-    mean_FP_delay = torch.cat(FP_delays).float().mean().item()
-    mean_delay = torch.cat(delays).float().mean().item()
-    mean_cover = np.mean(covers)
+    if verbose:
+        print(f"forward time: {t_forward:.3f}s, metric time: {t_metric:.3f}s")
+
+    # FIXME change `scale` to `t` and `scales` to `range(n_scales)`
+    mean_FP_delay = [torch.cat(FP_delays[scale]).float().mean().item() for scale in scales]
+    mean_delay = [torch.cat(delays[scale]).float().mean().item() for scale in scales]
+    mean_cover = [np.mean(covers[scale]) for scale in scales]
                    
     if verbose:
-        print(
-            "TN: {}, FP: {}, FN: {}, TP: {}, DELAY:{}, FP_DELAY:{}, COVER: {}".format(
-                TN, FP, FN, TP ,
-                mean_delay,
-                mean_FP_delay,
-                mean_cover
+        for t in range(n_scales):
+            print(
+                "Scale: {}, TN: {}, FP: {}, FN: {}, TP: {}, DELAY:{}, FP_DELAY:{}, COVER: {}".format(
+                    scale,
+                    TN[t], FP[t], FN[t], TP[t] ,
+                    mean_delay[t],
+                    mean_FP_delay[t],
+                    mean_cover[t]
+                )
             )
-        )
         
     del FP_delays
     del delays
@@ -233,97 +256,108 @@ def F1_score(confusion_matrix):
 
 
 #########################################################################################
+# def evaluation_pipeline(model, test_dataloader, threshold_list, device='cuda', verbose=False, 
+#                         model_type='seq2seq', subseq_len=None):
 def evaluation_pipeline(model, test_dataloader, threshold_list, device='cuda', verbose=False, 
-                        model_type='seq2seq', subseq_len=None):
+                        model_type='seq2seq', subseq_len=None, scales=None):
     try:
         model.to(device)
         model.eval()
     except:
         print('Cannot move model to device')    
     
-    cover_dict = {}
-    f1_dict = {}
-    f1_lib_dict = {}
+    # cover_dict = {}
+    # f1_dict = {}
+    # f1_lib_dict = {}
     
-    delay_dict = {}
-    fp_delay_dict = {}
-    confusion_matrix_dict = {}    
+    delay_dict_2d, fp_delay_dict_2d, confusion_matrix_dict_2d, cover_dict_2d, f1_dict_2d = \
+        [defaultdict(dict) for _ in range(5)]
 
     for threshold in tqdm(threshold_list):
-        (
-            TN,
-            FP,
-            FN,
-            TP,
-            mean_delay,
-            mean_fp_delay,
-            cover
-        ) = evaluate_metrics_on_set(model=model, test_loader=test_dataloader, threshold=threshold, 
-                                    verbose=verbose, model_type=model_type, device=device)
-
-        confusion_matrix_dict[threshold] = (TN, FP, FN, TP)
-        delay_dict[threshold] = mean_delay
-        fp_delay_dict[threshold] = mean_fp_delay        
         
-        cover_dict[threshold] = cover
-        f1_dict[threshold] = F1_score((TN, FP, FN, TP))
+        TN, FP, FN, TP, mean_delay, mean_fp_delay, cover = \
+            evaluate_metrics_on_set(model=model, test_loader=test_dataloader, threshold=threshold, 
+                                    verbose=verbose, model_type=model_type, device=device, scales=scales)
+            # evaluate_metrics_on_set(model=model, test_loader=test_dataloader, threshold=threshold, 
+            #                         verbose=verbose, model_type=model_type, device=device)
+
+        for t, scale in enumerate(scales):
+            confusion_matrix_dict_2d[scale][threshold] = (TN[t], FP[t], FN[t], TP[t])
+            delay_dict_2d[scale][threshold] = mean_delay[t]
+            fp_delay_dict_2d[scale][threshold] = mean_fp_delay[t]
             
-    auc = area_under_graph(list(delay_dict.values()), list(fp_delay_dict.values()))
+            cover_dict_2d[scale][threshold] = cover[t]
+            f1_dict_2d[scale][threshold] = F1_score((TN[t], FP[t], FN[t], TP[t]))
+            
+    best_metrics = {}
+    for scale in scales:
+        confusion_matrix_dict = confusion_matrix_dict_2d[scale]
+        delay_dict = delay_dict_2d[scale]
+        fp_delay_dict = fp_delay_dict_2d[scale]
+        f1_dict = f1_dict_2d[scale]
+        cover_dict = cover_dict_2d[scale]
 
-    # Conf matrix and F1
-    best_th_f1 = max(f1_dict, key=f1_dict.get)
- 
-    best_conf_matrix = (confusion_matrix_dict[best_th_f1][0], confusion_matrix_dict[best_th_f1][1], 
-                        confusion_matrix_dict[best_th_f1][2], confusion_matrix_dict[best_th_f1][3])
-    best_f1 = f1_dict[best_th_f1]
-    
-    # Cover
-    best_cover = cover_dict[best_th_f1]
-    
-    best_th_cover = max(cover_dict, key=cover_dict.get)
-    max_cover = cover_dict[best_th_cover]
-    
-    # Time to FA, detection delay
-    best_time_to_FA = fp_delay_dict[best_th_f1]
-    best_delay = delay_dict[best_th_f1]
+        auc = area_under_graph(list(delay_dict.values()), list(fp_delay_dict.values()))
 
+        # Conf matrix and F1
+        best_th_f1 = max(f1_dict, key=f1_dict.get)
     
-    if verbose:
-        print('AUC:', round(auc, 4))
-        print('Time to FA {}, delay detection {} for best-F1 threshold: {}'. format(round(best_time_to_FA, 4), 
-                                                                                       round(best_delay, 4), 
-                                                                                       round(best_th_f1, 4)))
-        print('TN {}, FP {}, FN {}, TP {} for best-F1 threshold: {}'. format(best_conf_matrix[0],
-                                                                             best_conf_matrix[1],
-                                                                             best_conf_matrix[2],
-                                                                             best_conf_matrix[3],
-                                                                             round(best_th_f1, 4)))
-        print('Max F1 {}: for best-F1 threshold {}'.format(round(best_f1, 4), round(best_th_f1, 4)))
-        print('COVER {}: for best-F1 threshold {}'.format(round(best_cover, 4), round(best_th_f1, 4)))
-
-        print('Max COVER {}: for threshold {}'.format(round(cover_dict[max(cover_dict, key=cover_dict.get)], 4), 
-                                                      round(max(cover_dict, key=cover_dict.get), 4)))
+        best_conf_matrix = (confusion_matrix_dict[best_th_f1][0], confusion_matrix_dict[best_th_f1][1], 
+                            confusion_matrix_dict[best_th_f1][2], confusion_matrix_dict[best_th_f1][3])
+        best_f1 = f1_dict[best_th_f1]
+        
+        # Cover
+        best_cover = cover_dict[best_th_f1]
+        
+        best_th_cover = max(cover_dict, key=cover_dict.get)
+        max_cover = cover_dict[best_th_cover]
+        
+        # Time to FA, detection delay
+        best_time_to_FA = fp_delay_dict[best_th_f1]
+        best_delay = delay_dict[best_th_f1]
 
         
-    return (best_th_f1, best_time_to_FA, best_delay, auc, best_conf_matrix, best_f1, best_cover, best_th_cover, max_cover), delay_dict, fp_delay_dict
+        if verbose:
+            print("Scale:", scale)
+            print('AUC:', round(auc, 4))
+            print('Time to FA {}, delay detection {} for best-F1 threshold: {}'. format(round(best_time_to_FA, 4), 
+                                                                                        round(best_delay, 4), 
+                                                                                        round(best_th_f1, 4)))
+            print('TN {}, FP {}, FN {}, TP {} for best-F1 threshold: {}'. format(best_conf_matrix[0],
+                                                                                best_conf_matrix[1],
+                                                                                best_conf_matrix[2],
+                                                                                best_conf_matrix[3],
+                                                                                round(best_th_f1, 4)))
+            print('Max F1 {}: for best-F1 threshold {}'.format(round(best_f1, 4), round(best_th_f1, 4)))
+            print('COVER {}: for best-F1 threshold {}'.format(round(best_cover, 4), round(best_th_f1, 4)))
+
+            print('Max COVER {}: for threshold {}'.format(round(cover_dict[max(cover_dict, key=cover_dict.get)], 4), 
+                                                        round(max(cover_dict, key=cover_dict.get), 4)))
+
+        best_metrics[scale] = (best_th_f1, best_time_to_FA, best_delay, auc, best_conf_matrix, best_f1, best_cover, best_th_cover, max_cover)
+        
+    return best_metrics, delay_dict_2d, fp_delay_dict_2d
 
 
-def write_metrics_to_file(filename, metrics, seed):
-    best_th_f1, best_time_to_FA, best_delay, auc, best_conf_matrix, best_f1, best_cover, best_th_cover, max_cover = metrics
-    
+def write_metrics_to_file(filename, metrics_local_dict, seed):
+
     with open(filename, 'a') as f:
-        f.writelines('SEED: {}\n'.format(seed))
-        f.writelines('AUC: {}\n'.format(auc))
-        f.writelines('Time to FA {}, delay detection {} for best-F1 threshold: {}\n'. format(round(best_time_to_FA, 4), 
-                                                                                       round(best_delay, 4), 
-                                                                                       round(best_th_f1, 4)))
-        f.writelines('TN {}, FP {}, FN {}, TP {} for best-F1 threshold: {}\n'. format(best_conf_matrix[0],
-                                                                               best_conf_matrix[1],
-                                                                               best_conf_matrix[2],
-                                                                               best_conf_matrix[3],
-                                                                               round(best_th_f1, 4)))
-        f.writelines('Max F1 {}: for best-F1 threshold {}\n'.format(round(best_f1, 4), round(best_th_f1, 4)))
-        f.writelines('COVER {}: for best-F1 threshold {}\n'.format(round(best_cover, 4), round(best_th_f1, 4)))
 
-        f.writelines('Max COVER {}: for threshold {}\n'.format(max_cover, best_th_cover))
-        f.writelines('----------------------------------------------------------------------\n')
+        for scale, metrics_local in metrics_local_dict.items():
+            best_th_f1, best_time_to_FA, best_delay, auc, best_conf_matrix, best_f1, best_cover, best_th_cover, max_cover = metrics_local
+    
+            f.writelines('SEED: {}, Scale: {}\n'.format(seed, scale))
+            f.writelines('AUC: {}\n'.format(auc))
+            f.writelines('Time to FA {}, delay detection {} for best-F1 threshold: {}\n'. format(round(best_time_to_FA, 4), 
+                                                                                        round(best_delay, 4), 
+                                                                                        round(best_th_f1, 4)))
+            f.writelines('TN {}, FP {}, FN {}, TP {} for best-F1 threshold: {}\n'. format(best_conf_matrix[0],
+                                                                                best_conf_matrix[1],
+                                                                                best_conf_matrix[2],
+                                                                                best_conf_matrix[3],
+                                                                                round(best_th_f1, 4)))
+            f.writelines('Max F1 {}: for best-F1 threshold {}\n'.format(round(best_f1, 4), round(best_th_f1, 4)))
+            f.writelines('COVER {}: for best-F1 threshold {}\n'.format(round(best_cover, 4), round(best_th_f1, 4)))
+
+            f.writelines('Max COVER {}: for threshold {}\n'.format(max_cover, best_th_cover))
+            f.writelines('----------------------------------------------------------------------\n')

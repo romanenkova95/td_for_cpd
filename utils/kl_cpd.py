@@ -293,7 +293,8 @@ def _history_future_separation_test(data, window, step=1):
     return history_slices, future_slices
 
 torch.set_printoptions(linewidth=200)
-def get_klcpd_output_2(kl_cpd_model, batch, window):
+# def get_klcpd_output_2(kl_cpd_model, batch, window):
+def get_klcpd_output_2(kl_cpd_model, batch, window, scales):    
     batch = batch.to(kl_cpd_model.device)
     if len(batch.shape) <= 4:
         seq_len = batch.shape[1]
@@ -327,5 +328,7 @@ def get_klcpd_output_2(kl_cpd_model, batch, window):
     #pred_out = torch.softmax(pred_out, dim=1)
     #pred_out = torch.tanh(pred_out)
     # pred_out = torch.tanh(pred_out * 1e4)
-    pred_out = torch.tanh(pred_out * 10 ** 7)
-    return pred_out
+    # pred_out = torch.tanh(pred_out * 10 ** 7)
+    # return pred_out
+    pred_out_list = [torch.tanh(pred_out * scale) for scale in scales]
+    return pred_out_list
