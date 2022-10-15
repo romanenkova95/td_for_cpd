@@ -15,6 +15,6 @@ WORKDIR /home/
 RUN pip install -r requirements.txt
 
 RUN groupadd -r -g 1007 cpd
-RUN useradd -r -u 1006 -g 1007 -m cpd
+RUN useradd -r -u 1006 -g 1007 -M cpd
 USER cpd
 WORKDIR /home/stash/eromanenkova/kl_cpd_for_video/
