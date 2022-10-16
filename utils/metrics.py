@@ -145,7 +145,6 @@ def evaluate_metrics_on_set(
 
             t_forward += t1 - t0
             t_metric  += t2 - t1
-            break
 
     # if verbose:
     print(f"forward time: {t_forward:.3f}s, metric time: {t_metric:.3f}s")

@@ -99,7 +99,7 @@ for scale, fp_delay_list, delay_list in zip(args_local.scales, fp_delay_list2d, 
     plt.yticks(fontsize=24)
     plt.legend(loc='upper left', fontsize=26);     
 
-    breakpoint()
+    # breakpoint()
     path_to_figure = path_to_saves / "figures" 
     path_to_figure.mkdir(parents=True, exist_ok=True)
     plt.savefig(path_to_figure / f'{model_name}_{scale}.png', dpi=300)
