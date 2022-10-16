@@ -81,10 +81,14 @@ def evaluate_metrics_on_set(
     model_type: str = 'seq2seq',
     subseq_len: int = None, 
     device: str = 'cuda',
-    scales: Optional[List]= None
+    scales: Optional[Sequence]= None
 ) -> Tuple[int, int, int, int, float, float]:
     """Calculate metrics for CPD.
     """
+
+    # if scales is None:
+    #     scales = ["none"]
+
     # calculate metrics on set
     model.eval()
     model.to(device)    
@@ -100,12 +104,13 @@ def evaluate_metrics_on_set(
         for test_inputs, test_labels in test_loader:
             t0 = time()
             # test_out, test_labels = get_models_predictions(test_inputs, test_labels, 
-            test_out_list, test_labels = get_models_predictions(test_inputs, test_labels, 
-                                                           model, 
-                                                           model_type=model_type, 
-                                                           subseq_len=subseq_len,
-                                                           device=device,
-                                                           scales=scales)
+            test_out_list, test_labels = get_models_predictions(test_inputs, 
+                                                                test_labels, 
+                                                                model, 
+                                                                model_type=model_type, 
+                                                                subseq_len=subseq_len,
+                                                                device=device,
+                                                                scales=scales)
 
             t1 = time()
 
@@ -130,7 +135,6 @@ def evaluate_metrics_on_set(
                     FN[s, t] += fn
                     TP[s, t] += tp
                     
-                    # FIXME change `scale` to `s`
                     FP_delays[(s, t)].append(FP_delay.detach().cpu())
                     delays[(s, t)].append(delay.detach().cpu())
                     covers[(s, t)].extend(cover)
@@ -153,9 +157,9 @@ def evaluate_metrics_on_set(
     # mean_FP_delay, mean_delay, mean_cover = [], [], []
     for s in range(n_scales):
         for t in range(n_thresholds):
-            mean_FP_delay[(s, t)] = torch.cat(FP_delays[(s, t)]).float().mean().item()
-            mean_delay[(s, t)] = torch.cat(delays[(s, t)]).float().mean().item()
-            mean_cover[(s, t)] = np.mean(covers[(s, t)])
+            mean_FP_delay[s, t] = torch.cat(FP_delays[(s, t)]).float().mean().item()
+            mean_delay[s, t] = torch.cat(delays[(s, t)]).float().mean().item()
+            mean_cover[s, t] = np.mean(covers[(s, t)])
                    
     if verbose:
         for s in range(n_scales):
@@ -276,6 +280,9 @@ def evaluation_pipeline(model, test_dataloader, threshold_list, device='cuda', v
     except:
         print('Cannot move model to device')    
     
+    if scales is None:
+        scales = ["none"]
+
     # cover_dict = {}
     # f1_dict = {}
     # f1_lib_dict = {}
@@ -323,6 +330,8 @@ def evaluation_pipeline(model, test_dataloader, threshold_list, device='cuda', v
         fp_delay_dict = fp_delay_dict_2d[scale]
         f1_dict = f1_dict_2d[scale]
         cover_dict = cover_dict_2d[scale]
+
+        print(f"Scale: {scale}", confusion_matrix_dict,   delay_dict,  fp_delay_dict,  f1_dict, cover_dict)
 
         auc = area_under_graph(list(delay_dict.values()), list(fp_delay_dict.values()))
 
