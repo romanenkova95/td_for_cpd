@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import List, Tuple, Optional
+from typing import List, Sequence, Tuple, Optional
 
 import numpy as np
 import torch
@@ -76,7 +76,7 @@ def get_models_predictions(inputs, labels, model, model_type='seq2seq', subseq_l
 def evaluate_metrics_on_set(
     model: nn.Module,
     test_loader: DataLoader,
-    threshold: float = 0.5,
+    thresholds: Sequence[float],
     verbose: bool = True,
     model_type: str = 'seq2seq',
     subseq_len: int = None, 
@@ -89,9 +89,10 @@ def evaluate_metrics_on_set(
     model.eval()
     model.to(device)    
     
-    n_scales = len(scales)
+    n_scales, n_thresholds = len(scales), len(thresholds)
     FP_delays, delays, covers = [defaultdict(list) for _ in range(3)]
-    TN, FP, FN, TP = [np.zeros(n_scales) for _ in range(4)]
+    mean_FP_delay, mean_delay, mean_cover = [np.zeros((n_scales, n_thresholds)) for _ in range(3)]
+    TN, FP, FN, TP = [np.zeros((n_scales, n_thresholds)) for _ in range(4)]
     
     t_forward, t_metric = 0, 0
     with torch.no_grad():
@@ -108,7 +109,7 @@ def evaluate_metrics_on_set(
 
             t1 = time()
 
-            for t, (scale, test_out) in enumerate(zip(scales, test_out_list)):
+            for s, (scale, test_out) in enumerate(zip(scales, test_out_list)):
                 try:
                     test_out = test_out.squeeze(2)
                 except:
@@ -117,48 +118,58 @@ def evaluate_metrics_on_set(
                     except:
                         test_out = test_out
 
-                tn, fp, fn, tp, FP_delay, delay, cover = calculate_metrics(test_labels, test_out > threshold)     
+                for t, threshold in enumerate(thresholds):
+
+                    tn, fp, fn, tp, FP_delay, delay, cover = calculate_metrics(test_labels, test_out > threshold)     
+
+                    if 'cuda' in device:
+                        torch.cuda.empty_cache() 
+
+                    TN[s, t] += tn
+                    FP[s, t] += fp
+                    FN[s, t] += fn
+                    TP[s, t] += tp
+                    
+                    # FIXME change `scale` to `s`
+                    FP_delays[(s, t)].append(FP_delay.detach().cpu())
+                    delays[(s, t)].append(delay.detach().cpu())
+                    covers[(s, t)].extend(cover)
+
 
                 del test_out
                 gc.collect()
-                if 'cuda' in device:
-                    torch.cuda.empty_cache() 
 
-                TN[t] += tn
-                FP[t] += fp
-                FN[t] += fn
-                TP[t] += tp
-                
-                # FIXME change `scale` to `t`
-                FP_delays[scale].append(FP_delay.detach().cpu())
-                delays[scale].append(delay.detach().cpu())
-                covers[scale].extend(cover)
-
-            del test_labels
             t2 = time()
+            del test_labels
+            gc.collect()
 
             t_forward += t1 - t0
             t_metric  += t2 - t1
+            break
 
-    if verbose:
-        print(f"forward time: {t_forward:.3f}s, metric time: {t_metric:.3f}s")
+    # if verbose:
+    print(f"forward time: {t_forward:.3f}s, metric time: {t_metric:.3f}s")
 
     # FIXME change `scale` to `t` and `scales` to `range(n_scales)`
-    mean_FP_delay = [torch.cat(FP_delays[scale]).float().mean().item() for scale in scales]
-    mean_delay = [torch.cat(delays[scale]).float().mean().item() for scale in scales]
-    mean_cover = [np.mean(covers[scale]) for scale in scales]
+    # mean_FP_delay, mean_delay, mean_cover = [], [], []
+    for s in range(n_scales):
+        for t in range(n_thresholds):
+            mean_FP_delay[(s, t)] = torch.cat(FP_delays[(s, t)]).float().mean().item()
+            mean_delay[(s, t)] = torch.cat(delays[(s, t)]).float().mean().item()
+            mean_cover[(s, t)] = np.mean(covers[(s, t)])
                    
     if verbose:
-        for t in range(n_scales):
-            print(
-                "Scale: {}, TN: {}, FP: {}, FN: {}, TP: {}, DELAY:{}, FP_DELAY:{}, COVER: {}".format(
-                    scale,
-                    TN[t], FP[t], FN[t], TP[t] ,
-                    mean_delay[t],
-                    mean_FP_delay[t],
-                    mean_cover[t]
+        for s in range(n_scales):
+            for t in range(n_thresholds):
+                print(
+                    "Scale: {}, TN: {}, FP: {}, FN: {}, TP: {}, DELAY:{}, FP_DELAY:{}, COVER: {}".format(
+                        scale,
+                        TN[s, t], FP[s, t], FN[s, t], TP[s, t] ,
+                        mean_delay[(s, t)],
+                        mean_FP_delay[(s, t)],
+                        mean_cover[(s, t)]
+                    )
                 )
-            )
         
     del FP_delays
     del delays
@@ -269,26 +280,43 @@ def evaluation_pipeline(model, test_dataloader, threshold_list, device='cuda', v
     # cover_dict = {}
     # f1_dict = {}
     # f1_lib_dict = {}
+    n_scales, n_thresholds = len(scales), len(threshold_list)
     
     delay_dict_2d, fp_delay_dict_2d, confusion_matrix_dict_2d, cover_dict_2d, f1_dict_2d = \
         [defaultdict(dict) for _ in range(5)]
 
-    for threshold in tqdm(threshold_list):
+    # for threshold in tqdm(threshold_list):
         
-        TN, FP, FN, TP, mean_delay, mean_fp_delay, cover = \
-            evaluate_metrics_on_set(model=model, test_loader=test_dataloader, threshold=threshold, 
-                                    verbose=verbose, model_type=model_type, device=device, scales=scales)
-            # evaluate_metrics_on_set(model=model, test_loader=test_dataloader, threshold=threshold, 
-            #                         verbose=verbose, model_type=model_type, device=device)
+    #     TN, FP, FN, TP, mean_delay, mean_fp_delay, cover = \
+    #         evaluate_metrics_on_set(model=model, test_loader=test_dataloader, threshold=threshold, 
+    #                                 verbose=verbose, model_type=model_type, device=device, scales=scales)
+    #         # evaluate_metrics_on_set(model=model, test_loader=test_dataloader, threshold=threshold, 
+    #         #                         verbose=verbose, model_type=model_type, device=device)
 
-        for t, scale in enumerate(scales):
-            confusion_matrix_dict_2d[scale][threshold] = (TN[t], FP[t], FN[t], TP[t])
-            delay_dict_2d[scale][threshold] = mean_delay[t]
-            fp_delay_dict_2d[scale][threshold] = mean_fp_delay[t]
+    #     for t, scale in enumerate(scales):
+    #         confusion_matrix_dict_2d[scale][threshold] = (TN[t], FP[t], FN[t], TP[t])
+    #         delay_dict_2d[scale][threshold] = mean_delay[t]
+    #         fp_delay_dict_2d[scale][threshold] = mean_fp_delay[t]
             
-            cover_dict_2d[scale][threshold] = cover[t]
-            f1_dict_2d[scale][threshold] = F1_score((TN[t], FP[t], FN[t], TP[t]))
+    #         cover_dict_2d[scale][threshold] = cover[t]
+    #         f1_dict_2d[scale][threshold] = F1_score((TN[t], FP[t], FN[t], TP[t]))
+
+    TN, FP, FN, TP, mean_delay, mean_fp_delay, cover = \
+        evaluate_metrics_on_set(model=model, test_loader=test_dataloader, thresholds=threshold_list, 
+                                verbose=verbose, model_type=model_type, device=device, scales=scales)
+        # evaluate_metrics_on_set(model=model, test_loader=test_dataloader, threshold=threshold, 
+        #                         verbose=verbose, model_type=model_type, device=device)
+
+    for s, scale in enumerate(scales):
+        for t, threshold in enumerate(threshold_list):
+            confusion_matrix_dict_2d[scale][threshold] = (TN[s, t], FP[s, t], FN[s, t], TP[s, t])
+            delay_dict_2d[scale][threshold] = mean_delay[s, t]
+            fp_delay_dict_2d[scale][threshold] = mean_fp_delay[s, t]
             
+            cover_dict_2d[scale][threshold] = cover[s, t]
+            f1_dict_2d[scale][threshold] = F1_score((TN[s, t], FP[s, t], FN[s, t], TP[s, t]))
+
+
     best_metrics = {}
     for scale in scales:
         confusion_matrix_dict = confusion_matrix_dict_2d[scale]
