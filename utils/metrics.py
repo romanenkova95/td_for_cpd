@@ -96,7 +96,7 @@ def evaluate_metrics_on_set(
     n_scales, n_thresholds = len(scales), len(thresholds)
     FP_delays, delays, covers = [defaultdict(list) for _ in range(3)]
     mean_FP_delay, mean_delay, mean_cover = [np.zeros((n_scales, n_thresholds)) for _ in range(3)]
-    TN, FP, FN, TP = [np.zeros((n_scales, n_thresholds)) for _ in range(4)]
+    TN, FP, FN, TP = [np.zeros((n_scales, n_thresholds), dtype=np.int32) for _ in range(4)]
     
     t_forward, t_metric = 0, 0
     with torch.no_grad():
@@ -331,7 +331,8 @@ def evaluation_pipeline(model, test_dataloader, threshold_list, device='cuda', v
         f1_dict = f1_dict_2d[scale]
         cover_dict = cover_dict_2d[scale]
 
-        print(f"Scale: {scale}", confusion_matrix_dict,   delay_dict,  fp_delay_dict,  f1_dict, cover_dict)
+        # FIXME Check if AUC, Time to FA and cover is the same as for single-scale, single-threshold case.
+        # print(f"Scale: {scale}", threshold_list, confusion_matrix_dict,   delay_dict,  fp_delay_dict,  f1_dict, cover_dict)
 
         auc = area_under_graph(list(delay_dict.values()), list(fp_delay_dict.values()))
 

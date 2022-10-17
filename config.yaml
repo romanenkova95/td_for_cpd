@@ -1,0 +1,21 @@
+train:
+  ext_name: 
+    value: x3d_m
+  block_type:
+    value: tcl3d
+  epochs:
+    value: 1 #200
+  bias_rank:
+    value: 1 #[1, 2]
+  emb_dim:
+    value: "32,8,8"
+  hid_dim:
+    value: "16,4,4"
+  experiments_name:  
+    value: road_accidents #[road_accidents, explosion]
+
+test:
+  threshold_number:
+    value: 25
+  scales:
+    value: [1e4, 1e5]

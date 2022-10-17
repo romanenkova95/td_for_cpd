@@ -14,6 +14,7 @@ import torch
 
 import os
 import time
+import sys
 # os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
@@ -25,7 +26,7 @@ bias = "all"
 def get_parser():
     parser = argparse.ArgumentParser(description='Test your model')
     parser.add_argument("--ext-name", type=str, default="x3d_m", help='name of extractor model')
-    parser.add_argument("--block-type", type=str, default="tcl3d", help='type of block', 
+    parser.add_argument("--block-type", type=str, default="tcl3d", help='type of block',
                         choices=["tcl3d", "tcl", "trl", "linear", "trl-half", "masked"])
     parser.add_argument("--epochs", type=int, default=200, help='Max number of epochs to train')
     parser.add_argument("--bias-rank", type=int, default=4, help='bias rank in TCL')
@@ -61,6 +62,8 @@ def get_args(parser):
     args['sqdist'] = 50
 
     args["dryrun"] = args_local.dryrun
+    if args_local.bias_rank == -1:
+        args_local.bias_rank = "full"
 
     if args["block_type"] == "tcl3d":
         # For TCL3D
@@ -68,7 +71,7 @@ def get_args(parser):
         args['RNN_hid_dim'] = tuple([int(i) for i in args_local.hid_dim.split(",")]) #(16, 4, 4) # 3072
         args['emb_dim'] = tuple([int(i) for i in args_local.emb_dim.split(",")]) #(32, 8, 8) # 3072
         args['bias_rank'] = args_local.bias_rank
-        
+
     elif args["block_type"] == "tcl":
         # For TCL
         args['data_dim'] = (192, 8, 8)
@@ -109,12 +112,14 @@ def get_args(parser):
         args["alphaD"] = 1e-3
         args["alphaG"] = 0.
 
-    print(f'Args: {args}')
+    # print(f'Args: {args}')
+    return args
 
 
 def main(args):
 
     experiments_name = args["experiments_name"]
+    timestamp = ""
     if not args["dryrun"]:
         timestamp = datetime.now().strftime("%y%m%dT%H%M%S")
         save_path = Path("saves/models") / experiments_name
@@ -126,7 +131,7 @@ def main(args):
 
     seed = args["seed"]
     models.fix_seeds(seed)
-        
+
     if args["block_type"] == "linear":
         netG = nets_original.NetG(args)
         netD = nets_original.NetD(args)
@@ -144,7 +149,7 @@ def main(args):
     kl_cpd_model = models.KLCPDVideo(netG, netD, args, train_dataset=train_dataset, test_dataset=test_dataset, extractor=extractor)
 
     logger = TensorBoardLogger(save_dir=f'logs/{experiments_name}', name='kl_cpd')
-    early_stop_callback = EarlyStopping(monitor="val_mmd2_real_D", stopping_threshold=1e-5, 
+    early_stop_callback = EarlyStopping(monitor="val_mmd2_real_D", stopping_threshold=1e-5,
                                         verbose=True, mode="min", patience=5)
 
     for param in kl_cpd_model.extractor.parameters():
@@ -164,12 +169,13 @@ def main(args):
     trainer.fit(kl_cpd_model)
 
     if not args["dryrun"]:
-        torch.save({"checkpoint": kl_cpd_model.state_dict(), "args": args}, save_path)    
+        torch.save({"checkpoint": kl_cpd_model.state_dict(), "args": args}, save_path)
 
-
+    return timestamp
 
 if __name__ == '__main__':
 
     parser = get_parser()
     args = get_args(parser)
-    main(args)
+    timestamp = main(args)
+    print(timestamp)
