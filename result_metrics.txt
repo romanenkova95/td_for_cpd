@@ -1,0 +1,168 @@
+SEED: x3d_xs
+AUC: 2.819047689437866
+Time to FA 0.0, delay detection 0.0 for best-F1 threshold: -0.001
+TN 0, FP 315, FN 0, TP 0 for best-F1 threshold: -0.001
+Max F1 0.0: for best-F1 threshold -0.001
+COVER 0.9806: for best-F1 threshold -0.001
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_s
+AUC: 2.819047689437866
+Time to FA 0.0, delay detection 0.0 for best-F1 threshold: -0.001
+TN 0, FP 315, FN 0, TP 0 for best-F1 threshold: -0.001
+Max F1 0.0: for best-F1 threshold -0.001
+COVER 0.9806: for best-F1 threshold -0.001
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_l
+AUC: 2.819047689437866
+Time to FA 0.0, delay detection 0.0 for best-F1 threshold: -0.001
+TN 0, FP 315, FN 0, TP 0 for best-F1 threshold: -0.001
+Max F1 0.0: for best-F1 threshold -0.001
+COVER 0.9806: for best-F1 threshold -0.001
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_xs
+AUC: 2.819047689437866
+Time to FA 0.0, delay detection 0.0 for best-F1 threshold: -0.001
+TN 0, FP 315, FN 0, TP 0 for best-F1 threshold: -0.001
+Max F1 0.0: for best-F1 threshold -0.001
+COVER 0.9806: for best-F1 threshold -0.001
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_s
+AUC: 2.533761667564761
+Time to FA 15.8889, delay detection 0.3143 for best-F1 threshold: 0.0067
+TN 298, FP 2, FN 12, TP 3 for best-F1 threshold: 0.0067
+Max F1 0.3: for best-F1 threshold 0.0067
+COVER 0.9791: for best-F1 threshold 0.0067
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_l
+AUC: 2.819047689437866
+Time to FA 0.0, delay detection 0.0 for best-F1 threshold: -0.001
+TN 0, FP 315, FN 0, TP 0 for best-F1 threshold: -0.001
+Max F1 0.0: for best-F1 threshold -0.001
+COVER 0.9806: for best-F1 threshold -0.001
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_xs
+AUC: 2.819047689437866
+Time to FA 0.0, delay detection 0.0 for best-F1 threshold: -0.001
+TN 0, FP 315, FN 0, TP 0 for best-F1 threshold: -0.001
+Max F1 0.0: for best-F1 threshold -0.001
+COVER 0.9806: for best-F1 threshold -0.001
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_xs
+AUC: 2.8201664220998452
+Time to FA 0.0, delay detection 0.0 for best-F1 threshold: -0.001
+TN 0, FP 315, FN 0, TP 0 for best-F1 threshold: -0.001
+Max F1 0.0: for best-F1 threshold -0.001
+COVER 0.9806: for best-F1 threshold -0.001
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_m
+AUC: 1.390975141525101
+Time to FA 11.0794, delay detection 0.0762 for best-F1 threshold: 0.9933
+TN 101, FP 206, FN 0, TP 8 for best-F1 threshold: 0.9933
+Max F1 0.0721: for best-F1 threshold 0.9933
+COVER 0.7394: for best-F1 threshold 0.9933
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_m
+AUC: 1.8983119523774512
+Time to FA 14.7968, delay detection 0.3048 for best-F1 threshold: 0.0759
+TN 237, FP 64, FN 11, TP 3 for best-F1 threshold: 0.0759
+Max F1 0.0741: for best-F1 threshold 0.0759
+COVER 0.918: for best-F1 threshold 0.0759
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_m
+AUC: 1.6408667508575618
+Time to FA 15.2571, delay detection 0.2984 for best-F1 threshold: 0.1589
+TN 259, FP 41, FN 11, TP 4 for best-F1 threshold: 0.1589
+Max F1 0.1333: for best-F1 threshold 0.1589
+COVER 0.944: for best-F1 threshold 0.1589
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_m
+AUC: 1.6391081542828658
+Time to FA 15.2921, delay detection 0.2984 for best-F1 threshold: 0.1589
+TN 262, FP 38, FN 11, TP 4 for best-F1 threshold: 0.1589
+Max F1 0.1404: for best-F1 threshold 0.1589
+COVER 0.9462: for best-F1 threshold 0.1589
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_m
+AUC: 1.8491308147576229
+Time to FA 10.5968, delay detection 0.1778 for best-F1 threshold: 0.1107
+TN 1, FP 301, FN 0, TP 13 for best-F1 threshold: 0.1107
+Max F1 0.0795: for best-F1 threshold 0.1107
+COVER 0.6875: for best-F1 threshold 0.1107
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_m
+AUC: 2.7356916234147235
+Time to FA 15.7524, delay detection 0.3365 for best-F1 threshold: 0.0759
+TN 289, FP 11, FN 14, TP 1 for best-F1 threshold: 0.0759
+Max F1 0.0741: for best-F1 threshold 0.0759
+COVER 0.9679: for best-F1 threshold 0.0759
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_m
+AUC: 1.6391081542828658
+Time to FA 15.2921, delay detection 0.2984 for best-F1 threshold: 0.1589
+TN 262, FP 38, FN 11, TP 4 for best-F1 threshold: 0.1589
+Max F1 0.1404: for best-F1 threshold 0.1589
+COVER 0.9462: for best-F1 threshold 0.1589
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_m
+AUC: 1.8752885533058716
+Time to FA 15.9111, delay detection 0.3079 for best-F1 threshold: 0.0344
+TN 300, FP 0, FN 12, TP 3 for best-F1 threshold: 0.0344
+Max F1 0.3333: for best-F1 threshold 0.0344
+COVER 0.9813: for best-F1 threshold 0.0344
+Max COVER 0.9813322210197211: for threshold 0.03444519566621118
+----------------------------------------------------------------------
+SEED: x3d_xs
+AUC: 2.819047689437866
+Time to FA 0.0, delay detection 0.0 for best-F1 threshold: -0.001
+TN 0, FP 315, FN 0, TP 0 for best-F1 threshold: -0.001
+Max F1 0.0: for best-F1 threshold -0.001
+COVER 0.9806: for best-F1 threshold -0.001
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_s
+AUC: 1.9197682138989833
+Time to FA 15.4603, delay detection 0.2286 for best-F1 threshold: 0.0067
+TN 281, FP 20, FN 8, TP 6 for best-F1 threshold: 0.0067
+Max F1 0.3: for best-F1 threshold 0.0067
+COVER 0.9633: for best-F1 threshold 0.0067
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_xs
+AUC: 2.819047689437866
+Time to FA 0.0, delay detection 0.0 for best-F1 threshold: -0.001
+TN 0, FP 315, FN 0, TP 0 for best-F1 threshold: -0.001
+Max F1 0.0: for best-F1 threshold -0.001
+COVER 0.9806: for best-F1 threshold -0.001
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_s
+AUC: 1.9197682138989833
+Time to FA 15.4603, delay detection 0.2286 for best-F1 threshold: 0.0067
+TN 281, FP 20, FN 8, TP 6 for best-F1 threshold: 0.0067
+Max F1 0.3: for best-F1 threshold 0.0067
+COVER 0.9633: for best-F1 threshold 0.0067
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------
+SEED: x3d_l
+AUC: 2.819047689437866
+Time to FA 0.0, delay detection 0.0 for best-F1 threshold: -0.001
+TN 0, FP 315, FN 0, TP 0 for best-F1 threshold: -0.001
+Max F1 0.0: for best-F1 threshold -0.001
+COVER 0.9806: for best-F1 threshold -0.001
+Max COVER 0.9806299603174603: for threshold -0.001
+----------------------------------------------------------------------

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 from typing import Tuple
+from utils import models_v2 as models
 
 class NetG(nn.Module):
     def __init__(self, args) -> None:
@@ -160,3 +161,30 @@ class NetD_Masked(nn.Module):
 
         return self.fc1.weight.norm(p=1) + self.fc1.bias.norm(p=1) \
              + self.fc2.weight.norm(p=1) + self.fc2.bias.norm(p=1)
+    
+    
+##############################################################################################
+#############################BCE MODEL##################################
+class BCE_GRU(nn.Module):
+    def __init__(self, args) -> None:
+        super().__init__()
+        
+        self.RNN_hid_dims = args['RNN_hid_dim']
+        self.emb_dims = args['emb_dim']
+        self.relu = nn.LeakyReLU(0.1)
+        self.data_dim = args['data_dim']
+
+        #self.fc_1 = nn.Linear(self.data_dim, self.emb_dims)
+        self.rnn = nn.GRU(self.data_dim, self.RNN_hid_dims, num_layers=args['num_layers'], batch_first=True)        
+        self.fc_2 = nn.Linear(self.RNN_hid_dims, 1)
+            
+        
+    def forward(self, x):
+        x = x.flatten(2)
+        #x = self.relu(self.fc_1(x)) # batch_size, timesteps, emb_dim
+        x, _ = self.rnn(x)
+        x = self.fc_2(x) # batch_size, timesteps, 1  
+        x = x.reshape(*x.shape[:2], 1)
+        x = torch.sigmoid(x)
+        print(x)
+        return x

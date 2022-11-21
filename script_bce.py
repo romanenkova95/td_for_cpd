@@ -33,7 +33,8 @@ def get_parser():
     parser.add_argument("--emb-dim", type=str, default="32,8,8", help='GRU embedding dim')
     parser.add_argument("--hid-dim", type=str, default="16,4,4", help='GRU hidden dim')
     parser.add_argument("--dryrun", action="store_true", help="Make test run")
-    parser.add_argument("--experiments-name", type=str, default="explosion", help='name of dataset', choices=["explosion", "road_accidents"])
+    parser.add_argument("--experiments-name", type=str, default="road_accidents", help='name of dataset', choices=["explosion", "road_accidents"])
+    parser.add_argument("--patience", type=int, default=10, help="Patience for early stopping")
     return parser
 
 def get_args(parser):
@@ -41,26 +42,18 @@ def get_args(parser):
     args_local = parser.parse_args()
     args = {}
     # FIXME  add seed to config
-    args["seed"] = 102
+    args["seed"] = 33
     args["experiments_name"] = args_local.experiments_name
     args["block_type"] = args_local.block_type
     args["bias"] = bias
     args["epochs"] = args_local.epochs# if not args_local.dryrun else 1
     args["name"] = args_local.ext_name
+    args['patience'] = args_local.patience
 
-    args['wnd_dim'] = 4 # 8
     args['batch_size'] = 8
-    args['lr'] = 1e-4
-    args['weight_decay'] = 0.
-    args['grad_clip'] = 10
-    args['CRITIC_ITERS'] = 5
-    args['weight_clip'] = .1
-    args['lambda_ae'] = 0.1 #0.001
-    args['lambda_real'] = 10 #0.1
+    args['lr'] = 1e-3
     args['num_layers'] = 1
-    args['window_1'] = 4 # 8
-    args['window_2'] = 4 # 8
-    args['sqdist'] = 50
+    args['grad_clip'] = 0.0
 
     args["dryrun"] = args_local.dryrun
     if args_local.bias_rank == -1:
@@ -78,6 +71,7 @@ def get_args(parser):
         args['data_dim'] = (192, 8, 8)
         args['RNN_hid_dim'] = (64, 8, 8) # 3072
         args['emb_dim'] = (64, 8, 8) # 3072
+        args["bias_rank"] = 1 # TODO CHECK!!!!!!!!!!!!!!!!!!
 
     elif args["block_type"] == "trl":
         # For TRL
@@ -102,8 +96,8 @@ def get_args(parser):
     elif args["block_type"] == "linear":
         # For Linear
         args['data_dim'] = 12288
-        args['RNN_hid_dim'] = 16
-        args['emb_dim'] = 100
+        args['RNN_hid_dim'] = 64
+        args['emb_dim'] = 12288
 
     elif args["block_type"] == "masked":
         # For Linear
@@ -125,7 +119,7 @@ def main(args):
         timestamp = datetime.now().strftime("%y%m%dT%H%M%S")
         save_path = Path("saves/models") / experiments_name
         save_path.mkdir(parents=True, exist_ok=True)
-        save_path = save_path / f'model_{args["name"]}_tl_{timestamp}.pth'
+        save_path = save_path / f'model_{args["name"]}_bce_tl_{timestamp}.pth'
         assert not save_path.exists(), f'Checkpoint {str(save_path)} already exists'
 
     train_dataset, test_dataset = datasets.CPDDatasets(experiments_name=experiments_name).get_dataset_()
@@ -134,32 +128,33 @@ def main(args):
     models.fix_seeds(seed)
 
     if args["block_type"] == "linear":
-        netG = nets_original.NetG(args)
-        netD = nets_original.NetD(args)
+        core_model = nets_original.BCE_GRU(args)
     elif args["block_type"] == "masked":
-        netG = nets_original.NetG_Masked(args)
-        netD = nets_original.NetD_Masked(args)
+        pass
     else:
-        netG = nets_tl.NetG_TL(args, block_type=args["block_type"], bias=args["bias"])
-        netD = nets_tl.NetD_TL(args, block_type=args["block_type"], bias=args["bias"])
+        core_model = nets_tl.BCE_GRU_TL(args, block_type=args["block_type"], bias=args["bias"])
 
     print(f'Use extractor {args["name"]}')
     extractor = torch.hub.load('facebookresearch/pytorchvideo:main', args["name"], pretrained=True)
     extractor = torch.nn.Sequential(*list(extractor.blocks[:5]))
 
-    kl_cpd_model = models.KLCPDVideo(netG, netD, args, train_dataset=train_dataset, test_dataset=test_dataset, extractor=extractor)
+    cpd_model = models.CPD_model(core_model,
+                                 args,
+                                 train_dataset=train_dataset,
+                                 test_dataset=test_dataset,
+                                 extractor=extractor,
+                                 batch_size=args['batch_size'])
 
-    logger = TensorBoardLogger(save_dir=f'logs/{experiments_name}', name='kl_cpd')
-    early_stop_callback = EarlyStopping(monitor="val_mmd2_real_D", stopping_threshold=1e-5,
-                                        verbose=True, mode="min", patience=5)
+    logger = TensorBoardLogger(save_dir=f'logs/{experiments_name}', name='bce_model')
+    early_stop_callback = EarlyStopping(monitor="val_loss",
+                                        patience=args["patience"], verbose=True, mode="min")
 
-    for param in kl_cpd_model.extractor.parameters():
+    for param in cpd_model.extractor.parameters():
         param.requires_grad = False
 
     trainer = pl.Trainer(
         max_epochs=args["epochs"], # 100
         gpus='1',
-        # devices='1',
         benchmark=True,
         check_val_every_n_epoch=1,
         gradient_clip_val=args['grad_clip'],
@@ -167,10 +162,10 @@ def main(args):
         callbacks=early_stop_callback
     )
 
-    trainer.fit(kl_cpd_model)
+    trainer.fit(cpd_model)
 
     if not args["dryrun"]:
-        torch.save({"checkpoint": kl_cpd_model.state_dict(), "args": args}, save_path)
+        torch.save({"checkpoint": cpd_model.state_dict(), "args": args}, save_path)
 
     return timestamp
 

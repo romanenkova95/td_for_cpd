@@ -15,7 +15,7 @@ def fix_seeds(seed):
     random.seed(seed)
     np.random.seed(seed)
 
-
+#########################-----KL-CPD models-----#########################
 class NetG(nn.Module):
     def __init__(self, args) -> None:
 
@@ -115,7 +115,6 @@ class NetE(nn.Module):
         return torch.stack(output, dim=2)
 
 
-#################################################################
 class KLCPDVideo(pl.LightningModule):
     def __init__(
         self,
@@ -352,3 +351,7 @@ class KLCPDVideo(pl.LightningModule):
             shuffle=False,
             num_workers=self.num_workers,
         )
+
+    
+#########################-----BCE models-----#########################
+    

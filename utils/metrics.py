@@ -70,7 +70,10 @@ def get_models_predictions(inputs, labels, model, model_type='seq2seq', subseq_l
     true_labels = labels.to(device)
     # outs = klcpd.get_klcpd_output_2(model, inputs, model.window_1, scales)
     # return outs, true_labels
-    outs_list = klcpd.get_klcpd_output_2(model, inputs, model.window_1, scales)
+    if model_type == "klcpd":
+        outs_list = klcpd.get_klcpd_output_2(model, inputs, model.window_1, scales)
+    else:
+        outs_list = [model(inputs)]
     return outs_list, true_labels
 
 def evaluate_metrics_on_set(
@@ -112,6 +115,7 @@ def evaluate_metrics_on_set(
                                                                 device=device,
                                                                 scales=scales)
 
+            print(test_out_list[0])
             t1 = time()
 
             for s, (scale, test_out) in enumerate(zip(scales, test_out_list)):

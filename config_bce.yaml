@@ -4,15 +4,17 @@ train:
   block_type:
     value: tcl3d
   epochs:
-    value: 500
+    value: 20
   bias_rank:
     values: [1, 2, 4, 8, -1]
   emb_dim:
-    values: ["32,8,8", "64,8,8", "128,8,8", "32,16,16", "64,16,16"]
+    values: ["64,8,8", "128,8,8", "32,16,16", "64,16,16"]
   hid_dim:
-    values: ["16,4,4", "32,4,4", "64,4,4", "16,8,8", "32,8,8"]
+    values: ["32,4,4", "64,4,4", "16,8,8", "32,8,8"]
   experiments_name:  
     values: [road_accidents, explosion]
+  patience:
+    value: 5
 
 test:
   threshold_number:

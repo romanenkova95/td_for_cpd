@@ -587,3 +587,67 @@ class TRLhalf(nn.Module):
             y = self.norm_out(y)
 
         return y
+    
+    
+#############################BCE MODEL##################################
+class BCE_GRU_TL(nn.Module):
+    def __init__(self, args, block_type, bias="none") -> None:
+        super().__init__()
+        
+        self.RNN_hid_dims = args['RNN_hid_dim']
+        self.emb_dims = args['emb_dim']
+        self.relu = nn.ReLU()
+        self.data_dim = args['data_dim']
+
+        fc_bias  = args['bias_rank'] if bias in ["all", "fc"]   else 0
+        gru_bias = args['bias_rank'] if bias in ["all", "gru"] else 0
+
+        if block_type.lower() == "tcl3d":
+            block, args_in, args_gru, args_out = TCL3D, {}, {}, {}
+        elif block_type.lower() == "tcl":
+            block, args_in, args_gru, args_out = TCL, {}, {}, {}
+        elif block_type.lower() == "trl":
+            block = TRL
+            args_in  = {"core_shape": args["ranks_input"]}
+            args_gru = {"ranks": args["ranks_gru"]}
+            args_out = {"core_shape": args["ranks_output"]}
+        elif block_type.lower() == "trl-half":
+            block = TRLhalf
+            args_in  = {"core_shape": args["ranks_input"]}
+            args_gru = {"ranks": args["ranks_gru"]}
+            args_out = {"core_shape": args["ranks_output"]}
+        else:
+            raise ValueError(f'Incorrect block type: {block_type}. Should be tcl or trl')
+             
+
+        #self.fc_1 = block((1, 1,) + self.data_dim, 
+        #                  (1, 1,) + self.emb_dims, 
+        #                  bias_rank=fc_bias, 
+        #                  freeze_modes=[0, 1],
+        #                  **args_in)
+                
+        self.rnn = custom_GRU_TL(block_type,
+                                 (1,) + self.data_dim, 
+                                 (1,) + self.RNN_hid_dims, 
+                                 bias_rank=gru_bias, 
+                                 freeze_modes=[0],
+                                 **args_gru) 
+        
+        self.fc_2 = block((1, 1,) + self.RNN_hid_dims, 
+                          (1, 1,) + (1, 1, 1), 
+                          bias_rank=fc_bias, 
+                          freeze_modes=[0, 1],
+                          **args_in)
+        
+    def forward(self, x):
+        
+        #x = self.relu(self.fc_1(x)) # batch_size, timesteps, C, H, W
+        #x = x.transpose(0, 1) # sequence first (timesteps, batch_size, input_dims)
+        x, _ = self.rnn(x)
+        #x = x.transpose(0, 1) # batch first (batch_size, timesteps, input_dims)
+        x = self.fc_2(x) 
+        x = x.reshape(*x.shape[:2], 1)# flatten accross last 3 dim
+        print(x)
+        x = torch.sigmoid(x)
+        print(x.reshape(*x.shape[:2]))
+        return x
