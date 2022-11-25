@@ -34,26 +34,35 @@ def load_config(file_name: str):
 
 def main(config: Dict):
 
-    train_cmd = ["python3", "script.py"]
+    train_cmd = ["python3", "script.py", "--model", config["model"]]
     for key, value in config["train"].items():
         train_cmd += [f'--{key.replace("_", "-")}', str(value)]
 
     cprint("Train command:\n" + " ".join(train_cmd), "red")
-    with Popen(train_cmd, stdout=PIPE) as proc:
-        output, _ = proc.communicate()
-        # print(output.decode("utf-8").splitlines())
-        timestamp = output.decode("utf-8").splitlines()[-1]
+    with Popen(train_cmd, stdout=PIPE, bufsize=1,
+               universal_newlines=True) as proc:
+
+        line_last = ""
+        assert proc.stdout is not None, f'proc.stdout is None'
+        for line in proc.stdout:
+            print(line, end="")
+            line_last = line
+        timestamp = line_last.rstrip()
 
     test_cmd = ["python3", "script_test.py", timestamp,
                 "--experiments-name", config["train"]["experiments_name"],
-                "--threshold-number", str(config["test"]["threshold_number"]),
-                "--scales"] + list(map(lambda x: str(int(float(x))), config["test"]["scales"]))
+                "--threshold-number", str(config["test"]["threshold_number"])]
+
+    if config["model"] == "kl-cpd":
+        test_cmd += list(map(lambda x: str(int(float(x))), config["test"]["scales"]))
 
     cprint("Test command:\n" + " ".join(test_cmd), "red")
-    with Popen(test_cmd, stdout=PIPE) as proc:
-        output, _ = proc.communicate()
-        # print(output.decode("utf-8"))
+    with Popen(test_cmd, stdout=PIPE, bufsize=1,
+               universal_newlines=True) as proc:
 
+        assert proc.stdout is not None, f'proc.stdout is None'
+        for line in proc.stdout:
+            print(line, end="")
 
     temp_file = Path(f'saves/temp_{timestamp}.pickle')
     with temp_file.open("rb") as f:
@@ -63,7 +72,7 @@ def main(config: Dict):
     logging_info.update(config["train"])
     logging_info.update(config["test"])
 
-    with Path("saves/results/log.txt").open("a") as f:
+    with Path(f'saves/results/log_{config["model"]}.txt').open("a") as f:
         for result in results:
             logging_info.update(result)
             # FIXME fix bug with `Object of type int32 is not JSON serializable` in logging_info["best_conf_matrix"]
@@ -94,7 +103,7 @@ if __name__ == "__main__":
         values_train = [None]
     if not update_test:
         values_test = [None]
-    if (not update_train) and (not update_test):
+    if not (update_train or update_test):
         main(config)
     else:
         for value_train in values_train:
