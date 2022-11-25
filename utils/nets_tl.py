@@ -61,6 +61,66 @@ class custom_GRU_TL(nn.Module):
 
         return outputs, h_prev
     
+class custom_LSTM_TL(nn.Module):
+
+    # TODO add num_layers parameter
+    def __init__(self, block_type, input_dims, hidden_dims, ranks=None, bias_rank=False, freeze_modes=None):
+        super().__init__()
+        
+        self.hidden_dims = hidden_dims
+
+        if block_type.lower() == "tcl3d":
+            block, args = TCL3D, {}
+        elif block_type.lower() == "tcl":
+            block, args = TCL, {}
+        elif block_type.lower() == "trl":
+            block, args = TRL, {"core_shape": ranks}
+        elif block_type.lower() == "trl-half":
+            block, args = TRLhalf, {"core_shape": ranks}
+        else:
+            raise ValueError(f'Incorrect block type: {block_type}. Should be tcl or trl')
+
+        self.linear_w = nn.ModuleList([
+            block(input_dims, hidden_dims, **args, bias_rank=bias_rank, freeze_modes=freeze_modes) 
+            for _ in range(4)])
+        
+        self.linear_u = nn.ModuleList([
+            block(hidden_dims, hidden_dims, **args, bias_rank=bias_rank, freeze_modes=freeze_modes) 
+            for _ in range(4)])
+        
+    
+    def forward(self, inputs, init_states=None):
+
+        # inputs shape: L, N, Hin
+        L, N, *input_dims = inputs.shape
+
+        outputs = []
+        if init_states is None:
+            h_prev = torch.zeros(N, *self.hidden_dims[1:]).to(inputs)
+            c_prev = torch.zeros(N, *self.hidden_dims[1:]).to(inputs)
+        else:
+            h_prev, c_prev = init_states
+        
+        for x_t in inputs:
+            x_z, x_r, x_h, x_c = [linear(x_t) for linear in self.linear_w]
+            h_z, h_r, h_h, h_c = [linear(h_prev) for linear in self.linear_u]
+            
+            output_z = torch.sigmoid(x_z + h_z) # update gate
+            output_r = torch.sigmoid(x_r + h_r) # forget gate 
+            output_o = torch.sigmoid(x_h + h_h) # output gate
+            output_c = torch.sigmoid(x_r + h_r) # cell input activation vector
+                        
+            c_prev = output_r * c_prev + output_z * output_c
+            h_prev = output_o * torch.sigmoid(c_prev)
+            
+            outputs.append(h_prev)#.clone().detach()) # NOTE fail with detach. check it
+        
+        outputs = torch.stack(outputs, dim=0)
+        # print(f'h1: {h_prev.shape}')
+
+        return outputs, (h_prev, c_prev)
+        
+    
 class NetD_TL(nn.Module):
     def __init__(self, args, block_type, bias="none") -> None:
         super().__init__()
@@ -222,7 +282,7 @@ class NetG_TL(nn.Module):
 
 class TCL3D(nn.Module):
     
-    def __init__(self, input_shape, output_shape, bias_rank=1, freeze_modes=None, normalize=True, method="einsum") -> None:
+    def __init__(self, input_shape, output_shape, bias_rank=1, freeze_modes=None, normalize="both", method="no_einsum") -> None:
         super().__init__()
 
         self.freeze_modes = freeze_modes if freeze_modes is not None else []
@@ -281,7 +341,7 @@ class TCL3D(nn.Module):
         # print(f'TCL forward: {self.rule}, X shape: {x.shape}')
         # print(f'x: {x.device}, w: {self.factors[0].weight.device}, b {self.bias.device}')
 
-        if self.normalize:
+        if self.normalize in ["both", "in"]:
             x = self.norm_in(x)
 
         if self.method == "einsum":
@@ -300,7 +360,7 @@ class TCL3D(nn.Module):
                     * self.bias_list[1][i][None, :, None] \
                     * self.bias_list[2][i][None, None, :]
 
-        if self.normalize:
+        if self.normalize in ["both", "out"]:
             y = self.norm_out(y)
 
         return y
@@ -368,7 +428,6 @@ class TCL(nn.Module):
             x = self.norm_in(x)
         y = torch.einsum(self.rule, x, *self.factors)
         # y = self.norm_out(y)
-
         # print(f'Output norm {torch.norm(y) / y.shape[0]:.3e}')
 
         if self.bias is not None:
@@ -637,17 +696,16 @@ class BCE_GRU_TL(nn.Module):
                           (1, 1,) + (1, 1, 1), 
                           bias_rank=fc_bias, 
                           freeze_modes=[0, 1],
+                          normalize="in",
                           **args_in)
         
     def forward(self, x):
-        
         #x = self.relu(self.fc_1(x)) # batch_size, timesteps, C, H, W
-        #x = x.transpose(0, 1) # sequence first (timesteps, batch_size, input_dims)
+        x = x.transpose(0, 1) # sequence first (timesteps, batch_size, input_dims)
         x, _ = self.rnn(x)
-        #x = x.transpose(0, 1) # batch first (batch_size, timesteps, input_dims)
+        x = x.transpose(0, 1) # batch first (batch_size, timesteps, input_dims)
         x = self.fc_2(x) 
+        
         x = x.reshape(*x.shape[:2], 1)# flatten accross last 3 dim
-        print(x)
         x = torch.sigmoid(x)
-        print(x.reshape(*x.shape[:2]))
         return x

@@ -115,7 +115,6 @@ def evaluate_metrics_on_set(
                                                                 device=device,
                                                                 scales=scales)
 
-            print(test_out_list[0])
             t1 = time()
 
             for s, (scale, test_out) in enumerate(zip(scales, test_out_list)):
@@ -130,7 +129,6 @@ def evaluate_metrics_on_set(
                 for t, threshold in enumerate(thresholds):
 
                     tn, fp, fn, tp, FP_delay, delay, cover = calculate_metrics(test_labels, test_out > threshold)     
-
                     if 'cuda' in device:
                         torch.cuda.empty_cache() 
 
@@ -316,7 +314,7 @@ def evaluation_pipeline(model, test_dataloader, threshold_list, device='cuda', v
                                 verbose=verbose, model_type=model_type, device=device, scales=scales)
         # evaluate_metrics_on_set(model=model, test_loader=test_dataloader, threshold=threshold, 
         #                         verbose=verbose, model_type=model_type, device=device)
-
+        
     for s, scale in enumerate(scales):
         for t, threshold in enumerate(threshold_list):
             confusion_matrix_dict_2d[scale][threshold] = (TN[s, t], FP[s, t], FN[s, t], TP[s, t])
@@ -339,7 +337,7 @@ def evaluation_pipeline(model, test_dataloader, threshold_list, device='cuda', v
         # print(f"Scale: {scale}", threshold_list, confusion_matrix_dict,   delay_dict,  fp_delay_dict,  f1_dict, cover_dict)
 
         auc = area_under_graph(list(delay_dict.values()), list(fp_delay_dict.values()))
-
+    
         # Conf matrix and F1
         best_th_f1 = max(f1_dict, key=f1_dict.get)
     

@@ -1,7 +1,7 @@
 Run docker:
 
 ```
-docker run -it -p 9999:9999 --rm --memory=32g --shm-size=32g --cpuset-cpus=0-2 --gpus '"device=1"' --security-opt label=disable --name er -v /home/eromanenkova:/home -v /home/eromanenkova/stash:/home/stash eromanenkova/cpd_video
+docker run -it -p 9999:9999 --rm --memory=32g --shm-size=32g --cpuset-cpus=0-2 --gpus '"device=1"' --security-opt label=disable --name er --init  -v /home/eromanenkova:/home -v /home/eromanenkova/stash:/home/stash eromanenkova/cpd_video
 ```
 
 Run script:

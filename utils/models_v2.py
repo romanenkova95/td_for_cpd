@@ -65,11 +65,8 @@ class KLCPDVideo(pl.LightningModule):
         X_p = self.extractor(X_p.float())
         X_f = self.extractor(X_f.float())
 
-        # print(torch.norm(X_p) / X_p.shape[0], torch.norm(X_f) / X_f.shape[0])
-
-        X_p = X_p.transpose(1, 2) #.flatten(2) # batch_size, timesteps, C*H*W
-        X_f = X_f.transpose(1, 2) #.flatten(2) # batch_size, timesteps, C*H*W
-        # print(f'X_p {X_p.shape}')
+        X_p = X_p.transpose(1, 2) # batch_size, timesteps, C, H, W
+        X_f = X_f.transpose(1, 2) # batch_size, timesteps, C, H, W
 
         X_p_enc, _ = self.netD(X_p)
         X_f_enc, _ = self.netD(X_f)
@@ -120,8 +117,8 @@ class KLCPDVideo(pl.LightningModule):
             X_p = self.extractor(X_p.float())
             X_f = self.extractor(X_f.float())
 
-            X_p = X_p.transpose(1, 2)#.flatten(2) # batch_size, timesteps, C*H*W
-            X_f = X_f.transpose(1, 2)#.flatten(2) # batch_size, timesteps, C*H*W
+            X_p = X_p.transpose(1, 2) # batch_size, timesteps, C, H, W
+            X_f = X_f.transpose(1, 2) # batch_size, timesteps, C, H, W
 
             batch_size = X_p.size(0)
 
@@ -130,7 +127,6 @@ class KLCPDVideo(pl.LightningModule):
             X_f_enc, X_f_dec = self.netD(X_f)
 
             # fake data
-            # noise = torch.FloatTensor(1, batch_size, self.args['RNN_hid_dim']).normal_(0, 1)
             if np.isscalar(self.args['RNN_hid_dim']):
                 noise = torch.FloatTensor(1, batch_size, self.args['RNN_hid_dim']).normal_(0, 1)
             else:
@@ -138,7 +134,6 @@ class KLCPDVideo(pl.LightningModule):
             noise.requires_grad = False
             noise = noise.to(self.device)
 
-            # Y_f = self.netG(X_p, X_f, noise)
             Y_f = self.netG(X_p, X_f, noise)
             Y_f_enc, Y_f_dec = self.netD(Y_f)
 
@@ -158,8 +153,6 @@ class KLCPDVideo(pl.LightningModule):
                 self.log("mlD", mask_loss_D, prog_bar=True)
                 lossD += self.alphaD * mask_loss_D
 
-            #print('train loss D:', lossD)
-
             return lossD
 
         # optimize generator (netG)
@@ -170,16 +163,14 @@ class KLCPDVideo(pl.LightningModule):
             X_p = self.extractor(X_p.float())
             X_f = self.extractor(X_f.float())
 
-            X_p = X_p.transpose(1, 2)#.flatten(2) # batch_size, timesteps, C*H*W
-            X_f = X_f.transpose(1, 2)#.flatten(2) # batch_size, timesteps, C*H*W
+            X_p = X_p.transpose(1, 2) # batch_size, timesteps, C, H, W
+            X_f = X_f.transpose(1, 2) # batch_size, timesteps, C, H, W
             batch_size = X_p.size(0)
 
             # real data
             X_f_enc, X_f_dec = self.netD(X_f)
 
             # fake data
-            # noise = torch.FloatTensor(1, batch_size, self.args['RNN_hid_dim']).normal_(0, 1)
-            # noise = torch.FloatTensor(batch_size, *self.args['RNN_hid_dim']).normal_(0, 1)
             if np.isscalar(self.args['RNN_hid_dim']):
                 noise = torch.FloatTensor(1, batch_size, self.args['RNN_hid_dim']).normal_(0, 1)
             else:
@@ -203,7 +194,6 @@ class KLCPDVideo(pl.LightningModule):
             #     self.log("mlG", mask_loss_G, prog_bar=True)
             #     lossG += self.alphaG * mask_loss_G
 
-            #print('train loss G:', lossG)
 
             return lossG
 
@@ -218,9 +208,8 @@ class KLCPDVideo(pl.LightningModule):
         X_p = self.extractor(X_p.float())
         X_f = self.extractor(X_f.float())
 
-        # print(f'X_p device: {X_p.device}')
-        X_p = X_p.transpose(1, 2)#.flatten(2) # batch_size, timesteps, C*H*W
-        X_f = X_f.transpose(1, 2)#.flatten(2) # batch_size, timesteps, C*H*W
+        X_p = X_p.transpose(1, 2) # batch_size, timesteps, C, H, W
+        X_f = X_f.transpose(1, 2) # batch_size, timesteps, C, H, W
 
         X_p_enc, _ = self.netD(X_p)
         X_f_enc, _ = self.netD(X_f)
@@ -249,10 +238,6 @@ class KLCPDVideo(pl.LightningModule):
                           num_workers=self.num_workers)
 
     def val_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.args['batch_size'], shuffle=False,
-                          num_workers=self.num_workers)
-
-    def test_dataloader(self):
         return DataLoader(self.test_dataset, batch_size=self.args['batch_size'], shuffle=False,
                           num_workers=self.num_workers)
 
@@ -319,7 +304,7 @@ class CPD_model(pl.LightningModule):
         inputs, labels = batch
         pred = self.forward(inputs.float())
         train_loss = self.loss(pred.squeeze(), labels.squeeze().float())
-
+        
         train_accuracy = (((pred.squeeze() >
                             0.5).long() == labels.squeeze()).float().mean())
 
@@ -338,7 +323,7 @@ class CPD_model(pl.LightningModule):
         """
         inputs, labels = batch
         pred = self.forward(inputs.float())
-
+        
         val_loss = self.loss(pred.squeeze(), labels.squeeze().float())
         val_accuracy = (((pred.squeeze() >
                           0.5).long() == labels.squeeze()).float().mean())
@@ -373,10 +358,3 @@ class CPD_model(pl.LightningModule):
         return DataLoader(
             self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers
         )
-
-    def test_dataloader(self) -> DataLoader:
-        """Initialize dataloader for test (same as for validation).
-
-        :return: dataloader for test
-        """
-        return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False)
