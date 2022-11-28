@@ -1,5 +1,5 @@
 from typing import Dict
-from utils import datasets, kl_cpd, models_v2 as models, nets_tl, nets_original, metrics
+from utils import datasets, model_utils, metrics
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -11,6 +11,8 @@ from pathlib import Path
 import os
 import argparse
 import pickle
+
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 def dump_results(metrics_local_dict: Dict, timestamp: str):
 
@@ -39,21 +41,27 @@ scales_part = [1e4, 1e5, 1e6, 1e7]
 
 parser = argparse.ArgumentParser(description='Test your model')
 parser.add_argument("timestamp", type=str, help='timestamp to be processed')
+parser.add_argument("--model", type=str, required=True, help='model name', choices=["bce", "kl-cpd"])
 parser.add_argument("--ext-name", type=str, default="x3d_m", help='name of extractor model')
 parser.add_argument("-tn", "--threshold-number", type=int, default=5, help='threshold number')
 parser.add_argument("--experiments-name", type=str, default="explosion", help='name of dataset', choices=["explosion", "road_accidents"])
-parser.add_argument("--scales", type=int, nargs='+', default=scales_part, help='scales for `get_klcpd_output_2`')
+parser.add_argument("--scales", type=int, nargs='*', help='scales for `get_klcpd_output_2`')
 args_local = parser.parse_args()
 
-# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+if args_local.model == "bce":
+    if args_local.scales is not None:
+        raise ValueError("BCE model has no scales")
+    else:
+        args_local.scales = ["none"]
+elif args_local.model == "kl-cpd" and args_local.scales is None:
+    args_local.scales = scales_part
 
 experiments_name = args_local.experiments_name
 train_dataset, test_dataset = datasets.CPDDatasets(experiments_name=experiments_name).get_dataset_()
 
 name = args_local.ext_name
 timestamp = args_local.timestamp
-model_name = f'{name}_tl_{timestamp}'
+model_name = f'{name}_{args_local.model}_tl_{timestamp}'
 save_path = Path("saves/models") / experiments_name / f'model_{model_name}.pth'
 assert save_path.exists(), f"Checkpoint {str(save_path)} doesn't exist"
 
@@ -67,23 +75,10 @@ if "name" not in args:
 
 
 seed = 0 # args["seed"]
-models.fix_seeds(seed)
+model_utils.fix_seeds(seed)
 
-if block_type == "linear":
-    netG = nets_original.NetG(args)
-    netD = nets_original.NetD(args)
-elif args["block_type"] == "masked":
-    netG = nets_original.NetG_Masked(args)
-    netD = nets_original.NetD_Masked(args)
-else:
-    netG = nets_tl.NetG_TL(args, block_type=block_type, bias=bias)
-    netD = nets_tl.NetD_TL(args, block_type=block_type, bias=bias)
-
-extractor = torch.hub.load('facebookresearch/pytorchvideo:main', args["name"], pretrained=True)
-extractor = torch.nn.Sequential(*list(extractor.blocks[:5]))
-
-kl_cpd_model = models.KLCPDVideo(netG, netD, args, train_dataset=train_dataset, test_dataset=test_dataset, extractor=extractor)
-kl_cpd_model.load_state_dict(state_dict)
+model = model_utils.get_model(args, train_dataset, test_dataset)
+model.load_state_dict(state_dict)
 
 
 threshold_number = args_local.threshold_number # 25
@@ -91,12 +86,14 @@ threshold_list = np.linspace(-5, 5, threshold_number)
 threshold_list = 1 / (1 + np.exp(-threshold_list))
 threshold_list = [-0.001] + list(threshold_list) + [1.001]
 
+model_type = "klcpd" if args_local.model == "kl-cpd" else "seq2seq"
+
 metrics_local, delay_list2d, fp_delay_list2d = \
-    metrics.evaluation_pipeline(kl_cpd_model,
-                                kl_cpd_model.val_dataloader(),
+    metrics.evaluation_pipeline(model,
+                                model.val_dataloader(),
                                 threshold_list,
                                 device='cuda',
-                                model_type='klcpd',
+                                model_type=model_type,
                                 verbose=False,
                                 scales=args_local.scales)
 

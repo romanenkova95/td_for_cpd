@@ -8,12 +8,12 @@ Run script:
 
 Train
 ```
-python3 script.py --block-type tcl3d --bias-rank 1 --experiments-name road_accidents --epochs 200
+python3 script.py --model bce --block-type tcl3d --bias-rank 1 --experiments-name road_accidents --epochs 200
 ```
 
 Test (`1665087354` is timestamp of model in command; for new trained models it will be smth like 221010T112811)
 ```
-python3 script_test.py 1665087354 --experiments-name road_accidents -tn 25
+python3 script_test.py 1665087354 --model bce  --experiments-name road_accidents -tn 25
 ```
 
 Results can be found in `saves/results/road_accidents/metrics`.

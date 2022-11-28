@@ -1,21 +1,20 @@
 import torch
-import nets_original
-import nets_tl
-import models_v2 as models
-from models_v2 import fix_seeds
+from . import nets_original, nets_tl, models_v2 as models
+from .models_v2 import fix_seeds
 
 def get_args(parser):
 
     args_local = parser.parse_args()
 
     args = {}
+    args["model"] = args_local.model
     args["seed"] = args_local.seed
     args["experiments_name"] = args_local.experiments_name
 
     args["name"] = args_local.ext_name
     args["epochs"] = args_local.epochs
     args['lr'] = args_local.lr
-
+    args["bias"] = "all"
 
     args["dryrun"] = args_local.dryrun
     if args_local.bias_rank == -1:
@@ -163,7 +162,7 @@ def get_model(args,
 
     if args["model"] == "bce":
         model = get_bce_model(args, extractor, train_dataset, test_dataset)
-    elif args["model"] == "bce":
+    elif args["model"] == "kl-cpd":
         model = get_kl_cpd_model(args, extractor, train_dataset, test_dataset)
     else:
         raise ValueError(f'Unknown model {args["model"]}')

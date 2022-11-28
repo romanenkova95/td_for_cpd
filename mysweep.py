@@ -49,12 +49,12 @@ def main(config: Dict):
             line_last = line
         timestamp = line_last.rstrip()
 
-    test_cmd = ["python3", "script_test.py", timestamp,
+    test_cmd = ["python3", "script_test.py", timestamp, "--model", config["model"],
                 "--experiments-name", config["train"]["experiments_name"],
                 "--threshold-number", str(config["test"]["threshold_number"])]
 
     if config["model"] == "kl-cpd":
-        test_cmd += list(map(lambda x: str(int(float(x))), config["test"]["scales"]))
+        test_cmd += ["--scales"] + list(map(lambda x: str(int(float(x))), config["test"]["scales"]))
 
     cprint("Test command:\n" + " ".join(test_cmd), "red")
     with Popen(test_cmd, stdout=PIPE, bufsize=1,
