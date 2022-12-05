@@ -20,12 +20,14 @@ os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 import argparse
 
+bias = "all"
+
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Test your model')
     parser.add_argument("--ext-name", type=str, default="x3d_m", help='name of extractor model')
     parser.add_argument("--block-type", type=str, default="tcl3d", help='type of block',
-                        choices=["tcl3d", "linear"])
+                        choices=["tcl3d", "tcl", "trl", "linear", "trl-half", "masked"])
     parser.add_argument("--epochs", type=int, default=200, help='Max number of epochs to train')
     parser.add_argument("--bias-rank", type=int, default=4, help='bias rank in TCL')
     parser.add_argument("--emb-dim", type=str, help='GRU embedding dim')
@@ -34,57 +36,78 @@ def get_parser():
     parser.add_argument("--experiments-name", type=str, default="road_accidents", help='name of dataset', choices=["explosion", "road_accidents"])
     parser.add_argument("--patience", type=int, default=10, help="Patience for early stopping")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate for training")
-    parser.add_argument("--seed", type=int, default=102, help="Random seed")
     return parser
 
 def get_args(parser):
 
     args_local = parser.parse_args()
-
-    assert args_local.block_type != "tcl", \
-        f"Temporaty don't use `tcl` which is not adjusted"
-
     args = {}
-    args["seed"] = args_local.seed
+    # FIXME  add seed to config
+    args["seed"] = 33
     args["experiments_name"] = args_local.experiments_name
-
     args["block_type"] = args_local.block_type
-
+    args["bias"] = bias
+    args["epochs"] = args_local.epochs# if not args_local.dryrun else 1
     args["name"] = args_local.ext_name
+    args['patience'] = args_local.patience
+
+    args['batch_size'] = 8
+    args['lr'] = args_local.lr
+    args['num_layers'] = 1
+    args['grad_clip'] = 0.0
+
+    args["dryrun"] = args_local.dryrun
+    if args_local.bias_rank == -1:
+        args_local.bias_rank = "full"
 
     if args["block_type"] in ["tcl3d", "tcl"]:
+        # For TCL3D
+        args['data_dim'] = (192, 8, 8)
         args['RNN_hid_dim'] = tuple([
             int(i) for i in args_local.hid_dim.split(",")
         ]) if args_local.hid_dim is not None else (32, 8, 8)
         args['emb_dim'] = tuple([
             int(i) for i in args_local.emb_dim.split(",")
         ]) if args_local.emb_dim is not None else (64, 8, 8)
+        args['bias_rank'] = args_local.bias_rank
+
+    elif args["block_type"] == "trl":
+        # For TRL
+        args['data_dim'] = (192, 8, 8)
+        args['RNN_hid_dim'] = (16, 4, 4)
+        args['emb_dim'] = (32, 8, 8)
+        args['ranks_input'] = (32, 4, 4, 8, 4, 4) # 3072
+        args['ranks_output'] = (8, 4, 4, 32, 4, 4) # 3072
+        args['ranks_gru'] = (8, 4, 4, 8, 4, 4) # 3072
+        args['bias_rank'] = 0 #args_local.bias_rank
+
+    elif args["block_type"] == "trl-half":
+        # For TRL
+        args['data_dim'] = (192, 8, 8)
+        args['RNN_hid_dim'] = (16, 4, 4)
+        args['emb_dim'] = (32, 8, 8)
+        args['ranks_input'] = (32, 4, 4)
+        args['ranks_output'] = (8, 4, 4)
+        args['ranks_gru'] = (8, 4, 4)
+        args['bias_rank'] = 0 #args_local.bias_rank
 
     elif args["block_type"] == "linear":
+        # For Linear
+        args['data_dim'] = 12288
         args['RNN_hid_dim'] = \
             int(args_local.hid_dim) if args_local.hid_dim is not None else 64
         args['emb_dim'] = \
             int(args_local.emb_dim) if args_local.emb_dim is not None else 12288
 
-    if args["block_type"] == "linear":
+    elif args["block_type"] == "masked":
+        # For Linear
         args['data_dim'] = 12288
-    else:
-        args['data_dim'] = (192, 8, 8)
-
-    args["epochs"] = args_local.epochs# if not args_local.dryrun else 1
-    args['batch_size'] = 16
-    args['lr'] = args_local.lr
-    args['num_layers'] = 1
-    args['grad_clip'] = 0.0
-
-    args['patience'] = args_local.patience
-
-    args["dryrun"] = args_local.dryrun
-
-    if args_local.bias_rank == -1:
-        args_local.bias_rank = "full"
-
-    args['bias_rank'] = args_local.bias_rank
+        args['RNN_hid_dim'] = \
+            int(args_local.hid_dim) if args_local.emb_dim is not None else 64
+        args['emb_dim'] = \
+            int(args_local.emb_dim) if args_local.emb_dim is not None else 12288
+        args["alphaD"] = 1e-3
+        args["alphaG"] = 0.
 
     # print(f'Args: {args}')
     return args
@@ -107,8 +130,9 @@ def main(args):
     models.fix_seeds(seed)
 
     if args["block_type"] == "linear":
-        print(args)
         core_model = nets_original.BCE_GRU(args)
+    elif args["block_type"] == "masked":
+        pass
     else:
         core_model = nets_tl.BCE_GRU_TL(args, block_type=args["block_type"], bias=args["bias"])
 

@@ -1,5 +1,5 @@
 from typing import Dict
-from utils import datasets, kl_cpd, models_v2 as models, nets_tl, nets_original, metrics
+from utils import datasets, models_v2 as models, nets_tl, nets_original, metrics
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -37,7 +37,7 @@ def dump_results(metrics_local_dict: Dict, timestamp: str):
 parser = argparse.ArgumentParser(description='Test your model')
 parser.add_argument("timestamp", type=str, help='timestamp to be processed')
 parser.add_argument("--ext-name", type=str, default="x3d_m", help='name of extractor model')
-parser.add_argument("-tn", "--threshold-number", type=int, default=5, help='threshold number')
+parser.add_argument("-tn", "--threshold-number", type=int, default=25, help='threshold number')
 parser.add_argument("--experiments-name", type=str, default="explosion", help='name of dataset', choices=["explosion", "road_accidents"])
 args_local = parser.parse_args()
 
@@ -57,7 +57,7 @@ checkpoint = torch.load(save_path)
 state_dict = checkpoint["checkpoint"]
 args = checkpoint["args"]
 block_type = args["block_type"]
-bias = args["bias"]
+bias = args["bias_rank"]
 if "name" not in args:
     args["name"] = args_local.ext_name
 
@@ -67,8 +67,6 @@ models.fix_seeds(seed)
 
 if block_type == "linear":
     core_model = nets_original.BCE_GRU(args)
-elif args["block_type"] == "masked":
-    pass
 else:
     core_model = nets_tl.BCE_GRU_TL(args, block_type=block_type, bias=bias)
 
@@ -76,6 +74,7 @@ extractor = torch.hub.load('facebookresearch/pytorchvideo:main', args["name"], p
 extractor = torch.nn.Sequential(*list(extractor.blocks[:5]))
 
 cpd_model = models.CPD_model(core_model, args, train_dataset=train_dataset, test_dataset=test_dataset, extractor=extractor)
+cpd_model.load_state_dict(state_dict)
 
 # logger = TensorBoardLogger(save_dir=f'logs/{experiments_name}', name='bce_model')
 # early_stop_callback = EarlyStopping(monitor="val_loss",
@@ -83,10 +82,10 @@ cpd_model = models.CPD_model(core_model, args, train_dataset=train_dataset, test
 
 threshold_number = args_local.threshold_number # 25
 threshold_list = np.linspace(-5, 5, threshold_number)
-threshold_list = 1 / (1 + np.exp(-threshold_list))
+threshold_list = 1 / (1 + np.exp(-threshold_list)) # TODOOOOOOOOOOOOOOOOOOOOOOOOoo
 threshold_list = [-0.001] + list(threshold_list) + [1.001]
 
-cpd_model.batch_size = 5
+
 metrics_local, delay_list2d, fp_delay_list2d = \
     metrics.evaluation_pipeline(cpd_model,
                                 cpd_model.val_dataloader(),
@@ -101,6 +100,7 @@ path_to_saves = Path('saves/results') / experiments_name
 path_to_metric = path_to_saves / "metrics"
 path_to_metric.mkdir(parents=True, exist_ok=True)
 
+print(metrics_local)
 metrics.write_metrics_to_file(f'{str(path_to_metric)}/{model_name}.txt',
                               metrics_local,
                               f'{name} tn {threshold_number}')

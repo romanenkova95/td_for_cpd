@@ -1,4 +1,4 @@
-model: "bce"
+model: "kl-cpd"
 train:
   ext_name: 
     value: x3d_m
@@ -9,9 +9,9 @@ train:
   bias_rank:
     value: 1
   emb_dim:
-    value: 12288
+    value: 1000
   hid_dim:
-    value: 64
+    value: 100
   experiments_name:  
     value: road_accidents
   patience:
@@ -24,3 +24,5 @@ train:
 test:
   threshold_number:
     value: 5
+  scales:
+    value: [1e4, 1e5]
