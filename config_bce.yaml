@@ -4,6 +4,10 @@ train:
     value: x3d_m
   block_type:
     value: linear
+  rnn_type:
+    value: lstm
+  flatten_type:
+    value: trl
   epochs:
     value: 1
   bias_rank:

@@ -25,12 +25,19 @@ def get_parser():
     parser = argparse.ArgumentParser(description='Test your model')
     parser.add_argument("--model", type=str, required=True, help='model name', choices=["bce", "kl-cpd"])
     parser.add_argument("--ext-name", type=str, default="x3d_m", help='name of extractor model')
-    parser.add_argument("--block-type", type=str, default="tcl3d", help='type of block',
-                        choices=["tcl3d", "tcl", "trl", "linear", "trl-half", "masked"])
+    parser.add_argument("--block-type", type=str, help='type of block',
+                        choices=["tcl3d", "tcl", "trl", "linear", "trl-half", "trl3dhalf", "masked"])
+    parser.add_argument("--rnn-type", type=str, help='type of rnn',
+                        choices=["gru", "lstm"])
+    parser.add_argument("--flatten-type", type=str, default="none", help='type of flatten',
+                        choices=["none", "trl"])
     parser.add_argument("--epochs", type=int, default=200, help='Max number of epochs to train')
     parser.add_argument("--bias-rank", type=int, default=4, help='bias rank in TCL')
-    parser.add_argument("--emb-dim", type=str, default="32,8,8", help='GRU embedding dim')
-    parser.add_argument("--hid-dim", type=str, default="16,4,4", help='GRU hidden dim')
+    parser.add_argument("--emb-dim", type=str, help='GRU embedding dim')
+    parser.add_argument("--hid-dim", type=str, help='GRU hidden dim')
+    parser.add_argument("--input-ranks", type=str, help='GRU hidden dim')
+    parser.add_argument("--output-ranks", type=str, help='GRU hidden dim')
+    parser.add_argument("--rnn_ranks", type=str, help='GRU hidden dim')
     parser.add_argument("--dryrun", action="store_true", help="Make test run")
     parser.add_argument("--experiments-name", type=str, default="road_accidents", help='name of dataset', choices=["explosion", "road_accidents"])
     parser.add_argument("--patience", type=int, default=10, help="Patience for early stopping")
