@@ -241,6 +241,8 @@ def parse_bce_args(args: Dict):
 
 def parse_bce_linear(args: Dict):
     fc_bias, gru_bias = init_bias(args)
+    gru_bias = isinstance(gru_bias, int) and gru_bias > 0 or gru_bias == "full"
+    fc_bias = isinstance(fc_bias, int) and fc_bias > 0 or fc_bias == "full"
 
     has_input_block = args["input_block"] not in ["flatten", "none"]
     input_dim = args['data_dim'] if not has_input_block else args['emb_dim']
@@ -250,17 +252,18 @@ def parse_bce_linear(args: Dict):
                           hidden_size=args['rnn_hid_dim'],
                           num_layers=args['num_layers'],
                           batch_first=True,
-                          bias=gru_bias > 0)
+                          bias=gru_bias)
     layer_output = nn.Linear(in_features=args['rnn_hid_dim'],
                              out_features=1,
-                             bias=fc_bias > 0)
+                             bias=fc_bias)
 
     if args["input_block"] in ["flatten", "none"]:
         layer_input = nn.Flatten(start_dim=2)
     elif args["input_block"] == "linear":
         layer_input = nn.Sequential(
             nn.Flatten(start_dim=2),
-            nn.Linear(args['data_dim'], args['emb_dim']), nn.ReLU())
+            nn.Linear(args['data_dim'], args['emb_dim'], bias=fc_bias),
+            nn.ReLU())
     elif args["input_block"] == "trl3dhalf":
         layer_input = TRL3Dhalf(input_shape=(1, 1, ) + args['data_dim'],
                                 output_shape=(1, 1, args['emb_dim']),
@@ -311,11 +314,12 @@ def parse_bce_tl(args: Dict):
 
         layer_output = block_output(**args_out, **args_out2)
     else:
+        fc_bias = isinstance(fc_bias, int) and fc_bias > 0 or fc_bias == "full"
         layer_output = nn.Sequential(
             nn.Flatten(start_dim=2),
             nn.Linear(in_features=np.prod(args['rnn_hid_dim']),
                       out_features=1,
-                      bias=fc_bias > 0))
+                      bias=fc_bias))
     if has_input_block:
         args_in = {
             "input_shape": (1, 1, ) + args['data_dim'],

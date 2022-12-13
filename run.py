@@ -57,30 +57,30 @@ def main(config: Dict):
         test_cmd += ["--scales"] + list(map(lambda x: str(int(float(x))), config["test"]["scales"]))
 
     cprint("Test command:\n" + " ".join(test_cmd), "red")
-    # with Popen(test_cmd, stdout=PIPE, bufsize=1,
-    #            universal_newlines=True) as proc:
+    with Popen(test_cmd, stdout=PIPE, bufsize=1,
+               universal_newlines=True) as proc:
 
-    #     assert proc.stdout is not None, f'proc.stdout is None'
-    #     for line in proc.stdout:
-    #         print(line, end="")
+        assert proc.stdout is not None, f'proc.stdout is None'
+        for line in proc.stdout:
+            print(line, end="")
 
-    # temp_file = Path(f'saves/temp_{timestamp}.pickle')
-    # with temp_file.open("rb") as f:
-    #     results = pickle.load(f)
+    temp_file = Path(f'saves/temp_{timestamp}.pickle')
+    with temp_file.open("rb") as f:
+        results = pickle.load(f)
 
-    # logging_info = {"timestamp": timestamp}
-    # logging_info.update(config["train"])
-    # logging_info.update(config["test"])
+    logging_info = {"timestamp": timestamp}
+    logging_info.update(config["train"])
+    logging_info.update(config["test"])
 
-    # with Path(f'saves/results/log_{config["model"]}.txt').open("a") as f:
-    #     for result in results:
-    #         logging_info.update(result)
-    #         # FIXME fix bug with `Object of type int32 is not JSON serializable` in logging_info["best_conf_matrix"]
-    #         logging_info["best_conf_matrix"] = [int(i) for i in logging_info["best_conf_matrix"]]
-    #         json.dump(logging_info, f)
-    #         f.write("\n")
+    with Path(f'saves/results/log_{config["model"]}.txt').open("a") as f:
+        for result in results:
+            logging_info.update(result)
+            # FIXME fix bug with `Object of type int32 is not JSON serializable` in logging_info["best_conf_matrix"]
+            logging_info["best_conf_matrix"] = [int(i) for i in logging_info["best_conf_matrix"]]
+            json.dump(logging_info, f)
+            f.write("\n")
 
-    # temp_file.unlink()
+    temp_file.unlink()
 
 
 
