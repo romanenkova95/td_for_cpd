@@ -3,7 +3,7 @@ from itertools import product
 from typing import Dict
 import yaml
 from pathlib import Path
-from subprocess import PIPE, Popen, STDOUT
+from subprocess import PIPE, Popen
 import pickle
 import json
 import argparse
@@ -34,59 +34,53 @@ def load_config(file_name: str):
 
 def main(config: Dict):
 
-    train_cmd = ["python3", "script_bce.py"]
+    train_cmd = ["python3", "train.py", "--model", config["model"]]
     for key, value in config["train"].items():
         train_cmd += [f'--{key.replace("_", "-")}', str(value)]
 
     cprint("Train command:\n" + " ".join(train_cmd), "red")
     with Popen(train_cmd, stdout=PIPE, bufsize=1,
                universal_newlines=True) as proc:
-        # , stderr=STDOUT
-        # output, _ = proc.communicate()
-        # print(output.decode("utf-8").splitlines())
-        # timestamp = output.decode("utf-8").splitlines()[-1]
-
-        # while True:
-        #   line = proc.stdout.readline()
-        #   if not line:
-        #     break
 
         line_last = ""
+        assert proc.stdout is not None, f'proc.stdout is None'
         for line in proc.stdout:
             print(line, end="")
             line_last = line
         timestamp = line_last.rstrip()
 
-    test_cmd = ["python3", "script_test_bce.py", timestamp,
+    test_cmd = ["python3", "test.py", timestamp, "--model", config["model"],
                 "--experiments-name", config["train"]["experiments_name"],
                 "--threshold-number", str(config["test"]["threshold_number"])]
 
+    if config["model"] == "kl-cpd":
+        test_cmd += ["--scales"] + list(map(lambda x: str(int(float(x))), config["test"]["scales"]))
+
     cprint("Test command:\n" + " ".join(test_cmd), "red")
-    with Popen(test_cmd, stdout=PIPE, bufsize=1,
-               universal_newlines=True) as proc:
-        # output, _ = proc.communicate()
-        # print(output.decode("utf-8"))
+    # with Popen(test_cmd, stdout=PIPE, bufsize=1,
+    #            universal_newlines=True) as proc:
 
-        for line in proc.stdout:
-            print(line, end="")
+    #     assert proc.stdout is not None, f'proc.stdout is None'
+    #     for line in proc.stdout:
+    #         print(line, end="")
 
-    temp_file = Path(f'saves/temp_{timestamp}.pickle')
-    with temp_file.open("rb") as f:
-        results = pickle.load(f)
+    # temp_file = Path(f'saves/temp_{timestamp}.pickle')
+    # with temp_file.open("rb") as f:
+    #     results = pickle.load(f)
 
-    logging_info = {"timestamp": timestamp}
-    logging_info.update(config["train"])
-    logging_info.update(config["test"])
+    # logging_info = {"timestamp": timestamp}
+    # logging_info.update(config["train"])
+    # logging_info.update(config["test"])
 
-    with Path("saves/results/log_bce.txt").open("a") as f:
-        for result in results:
-            logging_info.update(result)
-            # FIXME fix bug with `Object of type int32 is not JSON serializable` in logging_info["best_conf_matrix"]
-            logging_info["best_conf_matrix"] = [int(i) for i in logging_info["best_conf_matrix"]]
-            json.dump(logging_info, f)
-            f.write("\n")
+    # with Path(f'saves/results/log_{config["model"]}.txt').open("a") as f:
+    #     for result in results:
+    #         logging_info.update(result)
+    #         # FIXME fix bug with `Object of type int32 is not JSON serializable` in logging_info["best_conf_matrix"]
+    #         logging_info["best_conf_matrix"] = [int(i) for i in logging_info["best_conf_matrix"]]
+    #         json.dump(logging_info, f)
+    #         f.write("\n")
 
-    temp_file.unlink()
+    # temp_file.unlink()
 
 
 
@@ -109,7 +103,7 @@ if __name__ == "__main__":
         values_train = [None]
     if not update_test:
         values_test = [None]
-    if (not update_train) and (not update_test):
+    if not (update_train or update_test):
         main(config)
     else:
         for value_train in values_train:

@@ -23,25 +23,40 @@ import argparse
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Test your model')
-    parser.add_argument("--model", type=str, required=True, help='model name', choices=["bce", "kl-cpd"])
-    parser.add_argument("--ext-name", type=str, default="x3d_m", help='name of extractor model')
+    parser.add_argument("--model", type=str, required=True, help='model name', 
+                        choices=["bce", "kl-cpd"])
+    parser.add_argument("--ext-name", type=str, default="x3d_m", 
+                        help='name of extractor model')
     parser.add_argument("--block-type", type=str, help='type of block',
-                        choices=["tcl3d", "tcl", "trl", "linear", "trl-half", "trl3dhalf", "masked"])
+                        choices=["linear", "tcl3d", "trl3dhalf", "trl"])
     parser.add_argument("--rnn-type", type=str, help='type of rnn',
                         choices=["gru", "lstm"])
-    parser.add_argument("--flatten-type", type=str, default="none", help='type of flatten',
-                        choices=["none", "trl"])
-    parser.add_argument("--epochs", type=int, default=200, help='Max number of epochs to train')
-    parser.add_argument("--bias-rank", type=int, default=4, help='bias rank in TCL')
+    parser.add_argument("--input-block", type=str, default="none", 
+                        help='type of input block',
+                        choices=["none", "linear", "tcl3d", "trl3dhalf", "trl"]
+                        )
+    parser.add_argument("--output-block", type=str, default="same",
+                        help='type of output(flatten for bce) block for tl',
+                        choices=["same", "linear", "tcl3d", "trl3dhalf", "trl"]
+                        )
+    parser.add_argument("--epochs", type=int, default=200, 
+                        help='Max number of epochs to train')
+    parser.add_argument("--bias-rank", type=int, default=4, 
+                        help='bias rank in TCL')
     parser.add_argument("--emb-dim", type=str, help='GRU embedding dim')
     parser.add_argument("--hid-dim", type=str, help='GRU hidden dim')
     parser.add_argument("--input-ranks", type=str, help='GRU hidden dim')
     parser.add_argument("--output-ranks", type=str, help='GRU hidden dim')
     parser.add_argument("--rnn_ranks", type=str, help='GRU hidden dim')
     parser.add_argument("--dryrun", action="store_true", help="Make test run")
-    parser.add_argument("--experiments-name", type=str, default="road_accidents", help='name of dataset', choices=["explosion", "road_accidents"])
-    parser.add_argument("--patience", type=int, default=10, help="Patience for early stopping")
-    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate for training")
+    parser.add_argument("--experiments-name", type=str, 
+                        default="road_accidents", 
+                        help='name of dataset', 
+                        choices=["explosion", "road_accidents"])
+    parser.add_argument("--patience", type=int, default=10, 
+                        help="Patience for early stopping")
+    parser.add_argument("--lr", type=float, default=1e-3, 
+                        help="Learning rate for training")
     parser.add_argument("--seed", type=int, default=102, help="Random seed")
     return parser
 
@@ -64,9 +79,11 @@ def main(args):
     model_utils.fix_seeds(seed)
 
     model = model_utils.get_model(args, train_dataset, test_dataset)
-
     logger = TensorBoardLogger(save_dir=f'logs/{experiments_name}',
                                name=args["model"])
+
+    # print(args["EarlyStoppingParameters"])
+    print(f'Args: {args}')
 
     trainer = pl.Trainer(
         max_epochs=args["epochs"], # 100
