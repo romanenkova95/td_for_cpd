@@ -67,7 +67,7 @@ def add_bias_Nd(bias, bias_rank, bias_list):
 
     return y
 
-
+# TODO: replace freeze_modes with feature dims
 class TCL3D(nn.Module):
     def __init__(
         self,

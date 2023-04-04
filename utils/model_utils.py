@@ -125,8 +125,8 @@ def get_args(parser):
 
 def get_bce_args(args_local):
 
-    assert args_local.block_type in ["tcl3d", "trl3dhalf", "linear"], \
-        f'BCE model supports only tcl3d and linear blocks'
+    assert args_local.block_type in ["tcl3d", "trl3dhalf", "linear", "tcl", "trl-half"], \
+        f'BCE model supports only tcl*, trl* and linear blocks'
 
     args = {}
     args['batch_size'] = 16
@@ -181,7 +181,7 @@ def count_params(model):
     counter = 0
     for param in model.parameters():
         counter += param.numel()
-    
+
     return counter
 
 
@@ -199,6 +199,9 @@ def get_model(args,
                                    pretrained=True)
         extractor = torch.nn.Sequential(*list(extractor.blocks[:5]))
 
+    if args["experiments_name"].startswith("synthetic"):
+        extractor = torch.nn.Identity()
+
     if add_param_numel_to_args:
         args["extractor_params"] = count_params(extractor)
 
@@ -210,7 +213,8 @@ def get_model(args,
     elif args["model"] == "kl-cpd":
         model = get_kl_cpd_model(args, extractor, train_dataset, test_dataset)
         if add_param_numel_to_args:
-            args["model_params"] = count_params(model.net_generator) + count_params(model.net_discriminator)
+            args["model_gen_params"] = count_params(model.net_generator)
+            args["model_disc_params"] = count_params(model.net_discriminator)
     else:
         raise ValueError(f'Unknown model {args["model"]}')
 

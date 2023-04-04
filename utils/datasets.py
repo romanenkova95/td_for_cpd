@@ -7,8 +7,10 @@ import pickle
 import numpy as np
 import av
 from tqdm import tqdm
+import torch
 import torch.nn as nn
-from torch.utils.data import Dataset
+from torch.distributions.multivariate_normal import MultivariateNormal
+from torch.utils.data import Dataset, Subset
 from torchvision import transforms
 from torchvision.datasets.video_utils import VideoClips
 from torchvision.transforms import Compose, Lambda
@@ -17,6 +19,7 @@ from torchvision.transforms._transforms_video import (
     NormalizeVideo,
 )
 from pytorchvideo.transforms import ShortSideScale
+from .core_models import fix_seeds
 
 class CPDDatasets:
     """Class for experiments' datasets."""
@@ -24,13 +27,14 @@ class CPDDatasets:
     def __init__(self, experiments_name, random_seed=123) -> None:
         """Initialize class.
 
-        :param experiments_name: type of experiments ("explosion" or "road_accidents")
+        :param experiments_name: type of experiments ("explosion" or "road_accidents" or "synthetic_2D")
         """
         super().__init__()
         self.random_seed = random_seed
-        if experiments_name in ["explosion", "road_accidents"]:
-            self.experiments_name = experiments_name
-        else:
+        self.experiments_name = experiments_name
+        if self.experiments_name.startswith("synthetic"):
+            self.D = int(self.experiments_name.split('_')[1][:-1])                        
+        elif experiments_name not in ["explosion", "road_accidents"]:
             raise ValueError("Wrong experiment_name {}.".format(experiments_name))
 
     def get_dataset_(self) -> Tuple[Dataset, Dataset]:
@@ -39,53 +43,90 @@ class CPDDatasets:
         path_to_train_annotation = ''
         path_to_test_annotation = ''
 
-        if self.experiments_name == "explosion":
-            path_to_data = "data/explosion/"
-            path_to_train_annotation = path_to_data + "UCF_train_time_markup.txt"
-            path_to_test_annotation = path_to_data + "UCF_test_time_markup.txt"
+        
+        if self.experiments_name in ["explosion", "road_accidents"]:
+            if self.experiments_name == "explosion":
+                path_to_data = "data/explosion/"
+                path_to_train_annotation = path_to_data + "UCF_train_time_markup.txt"
+                path_to_test_annotation = path_to_data + "UCF_test_time_markup.txt"
 
-        elif self.experiments_name == "road_accidents":
-            path_to_data = "data/road_accidents/"
-            path_to_train_annotation = path_to_data + "UCF_road_train_time_markup.txt"
-            path_to_test_annotation = path_to_data + "UCF_road_test_time_markup.txt"
+            else:
+                path_to_data = "data/road_accidents/"
+                path_to_train_annotation = path_to_data + "UCF_road_train_time_markup.txt"
+                path_to_test_annotation = path_to_data + "UCF_road_test_time_markup.txt"
 
-        # https://pytorch.org/hub/facebookresearch_pytorchvideo_resnet/
-        mean = [0.45, 0.45, 0.45]
-        std = [0.225, 0.225, 0.225]
-        side_size = 256
-        crop_size = 256
-        transform = Compose(
-            [
-                Lambda(lambda x: x / 255.0),
-                NormalizeVideo(mean, std),
-                ShortSideScale(size=side_size),
-                CenterCropVideo(crop_size=(crop_size, crop_size)),
-            ]
-        )
+            # https://pytorch.org/hub/facebookresearch_pytorchvideo_resnet/
+            mean = [0.45, 0.45, 0.45]
+            std = [0.225, 0.225, 0.225]
+            side_size = 256
+            crop_size = 256
+            transform = Compose(
+                [
+                    Lambda(lambda x: x / 255.0),
+                    NormalizeVideo(mean, std),
+                    ShortSideScale(size=side_size),
+                    CenterCropVideo(crop_size=(crop_size, crop_size)),
+                ]
+            )
 
-        train_dataset = UCFVideoDataset(
-            clip_length_in_frames=16,
-            step_between_clips=5,
-            path_to_data=path_to_data,
-            path_to_annotation=path_to_train_annotation,
-            video_transform=transform,
-            num_workers=0,
-            fps=30,
-            sampler="equal",
-        )
-        test_dataset = UCFVideoDataset(
-            clip_length_in_frames=16,
-            step_between_clips=16,
-            path_to_data=path_to_data,
-            path_to_annotation=path_to_test_annotation,
-            video_transform=transform,
-            num_workers=0,
-            fps=30,
-            sampler="downsample_norm",
-        )
+            train_dataset = UCFVideoDataset(
+                clip_length_in_frames=16,
+                step_between_clips=5,
+                path_to_data=path_to_data,
+                path_to_annotation=path_to_train_annotation,
+                video_transform=transform,
+                num_workers=0,
+                fps=30,
+                sampler="equal",
+            )
+            test_dataset = UCFVideoDataset(
+                clip_length_in_frames=16,
+                step_between_clips=16,
+                path_to_data=path_to_data,
+                path_to_annotation=path_to_test_annotation,
+                video_transform=transform,
+                num_workers=0,
+                fps=30,
+                sampler="downsample_norm",
+            )
 
+        elif self.experiments_name.startswith("synthetic"):
+            dataset = SyntheticNormalDataset(seq_len=128, num=1000, D=self.D, random_seed=123)
+            train_dataset, test_dataset = CPDDatasets.train_test_split_(
+                dataset, test_size=0.3, shuffle=True, random_seed=self.random_seed
+            )
+        
         return train_dataset, test_dataset
 
+    
+    @staticmethod
+    def train_test_split_(
+        dataset: Dataset, test_size: float = 0.3, shuffle: bool = True, random_seed: int = 123
+    ) -> Tuple[Dataset, Dataset]:
+        """Split dataset on train and test.
+
+        :param dataset: dataset for splitting
+        :param test_size: size of test data
+        :param shuffle: if True, shuffle data
+        :return: tuple of
+            - train dataset
+            - test dataset
+        """
+        random.seed(random_seed)
+        np.random.seed(random_seed)
+        len_dataset = len(dataset)
+        idx = np.arange(len_dataset)
+
+        if shuffle:
+            train_idx = random.sample(list(idx), int((1 - test_size) * len_dataset))
+        else:
+            train_idx = idx[: -int(test_size * len_dataset)]
+        test_idx = np.setdiff1d(idx, train_idx)
+
+        train_set = Subset(dataset, train_idx)
+        test_set = Subset(dataset, test_idx)
+        return train_set, test_set
+    
 
 class UCFVideoDataset(Dataset):
     """Class for UCF video dataset."""
@@ -413,3 +454,73 @@ class UCFVideoDataset(Dataset):
             extra = []
         sample_idxs = cp_idxs + normal_from_cp + normal + extra
         return sample_idxs
+
+    
+class SyntheticNormalDataset(Dataset):
+
+    def __init__(self, seq_len: int, num: int, D=1, random_seed=123):
+
+        super().__init__()
+
+        self.data, self.labels = SyntheticNormalDataset.generate_synthetic_nD_data(seq_len, num, 
+                                                                                   D=D, random_seed=123)
+    def __len__(self) -> int:
+        """Get datasets' length.
+
+        :return: length of dataset
+        """
+        return len(self.data)
+    
+    def __getitem__(self, idx: int) -> Tuple[np.array, np.array]:
+
+        return self.data[idx], self.labels[idx]
+
+    @staticmethod
+    def generate_synthetic_nD_data(seq_len, num, D=1, random_seed=123, multi_dist=False):
+        fix_seeds(random_seed)
+
+        idxs_changes = torch.randint(1, seq_len, (num // 2, ))
+        
+        data = []
+        labels = []
+
+        for idx in idxs_changes:
+            mu = torch.randint(1, 100, (2, ))
+            
+            while mu[0] == mu[1]:
+                mu = torch.randint(1, 100, (2, ))
+            
+            if not multi_dist:
+                mu[0] = 1 
+           
+            m = MultivariateNormal(mu[0] * torch.ones(D), torch.eye(D))    
+            x1 = []
+            for _ in range(seq_len):
+                x1_ = m.sample()
+                x1.append(x1_)
+            x1 = torch.stack(x1)
+
+            m = MultivariateNormal(mu[1] * torch.ones(D), torch.eye(D))    
+            x2 = []
+            for _ in range(seq_len):
+                x2_ = m.sample()
+                x2.append(x2_)
+            x2 = torch.stack(x2)            
+                       
+            x = torch.cat([x1[:idx], x2[idx:]])
+            label = torch.cat([torch.zeros(idx), torch.ones(seq_len-idx)])
+            data.append(x)
+            labels.append(label)
+
+        for idx in range(0, num - len(idxs_changes)):            
+            m = MultivariateNormal(torch.ones(D), torch.eye(D))    
+            x = []
+            for _ in range(seq_len):
+                x_ = m.sample()
+                x.append(x_)
+            x = torch.stack(x)            
+            label = torch.zeros(seq_len)
+            
+            data.append(x)
+            labels.append(label)
+        return data, labels

@@ -20,6 +20,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 import argparse
 
+possible_blocks = ["linear", "tcl3d", "trl3dhalf", "tcl", "trl-half"]
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Test your model')
@@ -28,17 +29,15 @@ def get_parser():
     parser.add_argument("--ext-name", type=str, default="x3d_m", 
                         help='name of extractor model')
     parser.add_argument("--block-type", type=str, help='type of block',
-                        choices=["linear", "tcl3d", "trl3dhalf", "trl"])
+                        choices=possible_blocks)
     parser.add_argument("--rnn-type", type=str, help='type of rnn',
                         choices=["gru", "lstm"])
     parser.add_argument("--input-block", type=str, default="none", 
                         help='type of input block',
-                        choices=["none", "linear", "tcl3d", "trl3dhalf", "trl"]
-                        )
+                        choices=["none"] + possible_blocks)
     parser.add_argument("--output-block", type=str, default="same",
                         help='type of output(flatten for bce) block for tl',
-                        choices=["same", "linear", "tcl3d", "trl3dhalf", "trl"]
-                        )
+                        choices=["same"] + possible_blocks)
     parser.add_argument("--epochs", type=int, default=200, 
                         help='Max number of epochs to train')
     parser.add_argument("--bias-rank", type=int, default=4, 
@@ -47,12 +46,12 @@ def get_parser():
     parser.add_argument("--hid-dim", type=str, help='GRU hidden dim')
     parser.add_argument("--input-ranks", type=str, help='GRU hidden dim')
     parser.add_argument("--output-ranks", type=str, help='GRU hidden dim')
-    parser.add_argument("--rnn_ranks", type=str, help='GRU hidden dim')
+    parser.add_argument("--rnn-ranks", type=str, help='GRU hidden dim')
     parser.add_argument("--dryrun", action="store_true", help="Make test run")
     parser.add_argument("--experiments-name", type=str, 
                         default="road_accidents", 
                         help='name of dataset', 
-                        choices=["explosion", "road_accidents"])
+                        choices=["explosion", "road_accidents", "synthetic_2D"])
     parser.add_argument("--patience", type=int, default=10, 
                         help="Patience for early stopping")
     parser.add_argument("--lr", type=float, default=1e-3, 
