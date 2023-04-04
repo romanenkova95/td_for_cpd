@@ -44,6 +44,8 @@ def get_parser():
                         help='bias rank in TCL')
     parser.add_argument("--emb-dim", type=str, help='GRU embedding dim')
     parser.add_argument("--hid-dim", type=str, help='GRU hidden dim')
+    parser.add_argument("--feature-dim", type=int, default=3, 
+                        help='how many dimensions do features cover?')
     parser.add_argument("--input-ranks", type=str, help='GRU hidden dim')
     parser.add_argument("--output-ranks", type=str, help='GRU hidden dim')
     parser.add_argument("--rnn-ranks", type=str, help='GRU hidden dim')

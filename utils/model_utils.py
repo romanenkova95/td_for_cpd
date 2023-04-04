@@ -23,11 +23,11 @@ default_values = {
         "rnn_hid_dim": 16,
         "emb_dim": 100
     },
-    "trl": {
-        "ranks_input": (32, 4, 4, 8, 4, 4),
-        "ranks_output": (8, 4, 4, 32, 4, 4),
-        "ranks_rnn": (8, 4, 4, 8, 4, 4)
-    },
+    # "trl": {
+    #     "ranks_input": (32, 4, 4, 8, 4, 4),
+    #     "ranks_output": (8, 4, 4, 32, 4, 4),
+    #     "ranks_rnn": (8, 4, 4, 8, 4, 4)
+    # },
     "trl-half": {
         "ranks_input": (192, 8, 8),
         "ranks_output": (8, 4, 4),
@@ -58,7 +58,8 @@ def get_args(parser):
     args = {}
     copy_keys = [
         "model", "seed", "experiments_name", "epochs", "lr", "dryrun",
-        "bias_rank", "block_type", "rnn_type", "input_block", "output_block"
+        "bias_rank", "block_type", "rnn_type", "input_block", "output_block", 
+        "feature_dim"
     ]
 
     for key in copy_keys:
@@ -68,8 +69,8 @@ def get_args(parser):
     args['num_layers'] = 1
     args["name"] = args_local.ext_name
 
-    if args["bias_rank"] == -1:
-        args["bias_rank"] = "full"
+    # if args["bias_rank"] == -1:
+    #     args["bias_rank"] = "full"
     if args["output_block"] == "same":
         args["output_block"] = args["block_type"]
 

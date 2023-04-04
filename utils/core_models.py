@@ -149,6 +149,7 @@ class KlcpdGenTl(nn.Module):
         self.rnn_hid_dims = args["rnn_hid_dim"]
         self.emb_dims = args["emb_dim"]
         self.relu = nn.ReLU()
+        feature_dims = args["feature_dim"] 
 
         fc_bias, gru_bias = init_bias(args)
         block, (args_in, args_gru, args_out) = init_fc_rnn_tl(block_type, args)
@@ -157,7 +158,7 @@ class KlcpdGenTl(nn.Module):
             (1, 1,) + args["data_dim"],
             (1, 1,) + self.emb_dims,
             bias_rank=fc_bias,
-            freeze_modes=[0, 1],
+            feature_dims=feature_dims,
             **args_in
         )
 
@@ -166,7 +167,7 @@ class KlcpdGenTl(nn.Module):
             (1,) + self.emb_dims,
             (1,) + self.rnn_hid_dims,
             bias_rank=gru_bias,
-            freeze_modes=[0],
+            feature_dims=feature_dims,
             **args_gru
         )
 
@@ -175,7 +176,7 @@ class KlcpdGenTl(nn.Module):
             (1,) + self.emb_dims,
             (1,) + self.rnn_hid_dims,
             bias_rank=gru_bias,
-            freeze_modes=[0],
+            feature_dims=feature_dims,
             **args_gru
         )
 
@@ -183,7 +184,7 @@ class KlcpdGenTl(nn.Module):
             (1, 1,) + self.rnn_hid_dims,
             (1, 1,) + args["data_dim"],
             bias_rank=fc_bias,
-            freeze_modes=[0, 1],
+            feature_dims=feature_dims,
             **args_out
         )
 
@@ -234,6 +235,7 @@ class KlcpdDiscTl(nn.Module):
         self.emb_dims = args["emb_dim"]
         self.relu = nn.ReLU()
         self.data_dim = args["data_dim"]
+        feature_dims = args["feature_dim"] 
 
         fc_bias, gru_bias = init_bias(args)
         block, (args_in, args_gru, args_out) = init_fc_rnn_tl(block_type, args)
@@ -242,7 +244,7 @@ class KlcpdDiscTl(nn.Module):
             (1, 1,) + self.data_dim,
             (1, 1,) + self.emb_dims,
             bias_rank=fc_bias,
-            freeze_modes=[0, 1],
+            feature_dims=feature_dims,
             **args_in
         )
 
@@ -251,7 +253,7 @@ class KlcpdDiscTl(nn.Module):
             (1,) + self.emb_dims,
             (1,) + self.rnn_hid_dims,
             bias_rank=gru_bias,
-            freeze_modes=[0],
+            feature_dims=feature_dims,
             **args_gru
         )
 
@@ -260,7 +262,7 @@ class KlcpdDiscTl(nn.Module):
             (1,) + self.rnn_hid_dims,
             (1,) + self.emb_dims,
             bias_rank=gru_bias,
-            freeze_modes=[0],
+            feature_dims=feature_dims,
             **args_gru
         )
 
@@ -268,7 +270,7 @@ class KlcpdDiscTl(nn.Module):
             (1, 1,) + self.emb_dims,
             (1, 1,) + self.data_dim,
             bias_rank=fc_bias,
-            freeze_modes=[0, 1],
+            feature_dims=feature_dims,
             **args_out
         )
 
@@ -349,6 +351,7 @@ class BceRNNTl(nn.Module):
         self.emb_dims = args["emb_dim"]
         self.relu = nn.ReLU()
         self.data_dim = args["data_dim"]
+        feature_dims = args["feature_dim"] 
 
         fc_bias, rnn_bias = init_bias(args)
         block, (args_in, args_rnn, args_out) = init_fc_rnn_tl(block_type, args)
@@ -358,7 +361,7 @@ class BceRNNTl(nn.Module):
             (1,) + self.data_dim,
             (1,) + self.rnn_hid_dims,
             bias_rank=rnn_bias,
-            freeze_modes=[0],
+            feature_dims=feature_dims,
             batch_first=True,
             **args_rnn
         )
@@ -367,7 +370,7 @@ class BceRNNTl(nn.Module):
             (1, 1,) + self.rnn_hid_dims,
             (1, 1,) + (1, 1, 1),
             bias_rank=fc_bias,
-            freeze_modes=[0, 1],
+            feature_dims=feature_dims,
             normalize="in",
             **args_out
         )
@@ -393,7 +396,7 @@ class BceRNNTl_v2(nn.Module):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
 
         output = self.input_layer(input)
-
+        
         output, _ = self.rnn(output)
         output = self.output_layer(output)
         output = output.reshape(*output.shape[:2], 1)  # flatten across last 3 dim

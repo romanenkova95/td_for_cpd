@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from .tensor_layers import TCL, TCL3D, TRL, TRLhalf, TRL3Dhalf
+from .tensor_layers import TCL, TCL3D, TRLhalf, TRL3Dhalf
 
 
 class GruTl(nn.Module):
@@ -12,9 +12,9 @@ class GruTl(nn.Module):
             block_type: str,
             input_dims: Tuple[int, int, int],
             hidden_dims: int,
+            feature_dims: int,
             ranks = None,
             bias_rank = False,
-            freeze_modes = None,
             batch_first=True
     ) -> object:
         super().__init__()
@@ -26,8 +26,8 @@ class GruTl(nn.Module):
             block, args = TCL3D, {}
         elif block_type.lower() == "tcl":
             block, args = TCL, {}
-        elif block_type.lower() == "trl":
-            block, args = TRL, {"core_shape": ranks}
+        # elif block_type.lower() == "trl":
+        #     block, args = TRL, {"core_shape": ranks}
         elif block_type.lower() == "trl-half":
             block, args = TRLhalf, {"core_shape": ranks}
         elif block_type.lower() == "trl3dhalf":
@@ -43,8 +43,8 @@ class GruTl(nn.Module):
                     input_dims,
                     hidden_dims,
                     **args,
+                    feature_dims=feature_dims,
                     bias_rank=bias_rank,
-                    freeze_modes=freeze_modes,
                 )
                 for _ in range(3)
             ]
@@ -56,8 +56,8 @@ class GruTl(nn.Module):
                     hidden_dims,
                     hidden_dims,
                     **args,
+                    feature_dims=feature_dims,
                     bias_rank=bias_rank,
-                    freeze_modes=freeze_modes,
                 )
                 for _ in range(3)
             ]
@@ -101,7 +101,7 @@ class GruTl(nn.Module):
 class LstmTl(nn.Module):
 
     # TODO add num_layers parameter
-    def __init__(self, block_type, input_dims, hidden_dims, ranks=None, bias_rank=False, freeze_modes=None, batch_first=True):
+    def __init__(self, block_type, input_dims, hidden_dims, feature_dims, ranks=None, bias_rank=False, batch_first=True):
         super().__init__()
 
         self.hidden_dims = hidden_dims
@@ -111,21 +111,21 @@ class LstmTl(nn.Module):
             block, args = TCL3D, {}
         elif block_type.lower() == "tcl":
             block, args = TCL, {}
-        elif block_type.lower() == "trl":
-            block, args = TRL, {"core_shape": ranks}
+        # elif block_type.lower() == "trl":
+        #     block, args = TRL, {"core_shape": ranks}
         elif block_type.lower() == "trl-half":
             block, args = TRLhalf, {"core_shape": ranks}
         elif block_type.lower() == "trl3dhalf":
             block, args = TRL3Dhalf, {"core_shape": ranks}
         else:
-            raise ValueError(f'Incorrect block type: {block_type}. Should be tcl or trl')
+            raise ValueError(f'Incorrect block type: {block_type}. Should be tcl or trl-half')
 
         self.linear_w = nn.ModuleList([
-            block(input_dims, hidden_dims, **args, bias_rank=bias_rank, freeze_modes=freeze_modes)
+            block(input_dims, hidden_dims, **args, feature_dims=feature_dims, bias_rank=bias_rank)
             for _ in range(4)])
 
         self.linear_u = nn.ModuleList([
-            block(hidden_dims, hidden_dims, **args, bias_rank=bias_rank, freeze_modes=freeze_modes)
+            block(hidden_dims, hidden_dims, **args, feature_dims=feature_dims, bias_rank=bias_rank)
             for _ in range(4)])
 
 
@@ -183,17 +183,17 @@ def init_fc_rnn_tl(block_type, args):
         block = TCL3D
     elif block_type == "tcl":
         block = TCL
-    elif block_type == "trl":
-        block = TRL
+    # elif block_type == "trl":
+    #     block = TRL
     elif block_type == "trl-half":
         block = TRLhalf
     elif block_type == "trl3dhalf":
         block = TRL3Dhalf
     else:
         raise ValueError(
-            f'Incorrect block type: {block_type}. Should be tcl or trl')
+            f'Incorrect block type: {block_type}. Should be tcl or trl-half')
 
-    if block_type in ["trl", "trl-half", "trl3dhalf"]:
+    if block_type in ["trl-half", "trl3dhalf"]:
         args_in["core_shape"] = args["ranks_input"]
         args_rnn["ranks"] = args["ranks_rnn"]
         args_out["core_shape"] = args["ranks_output"]
@@ -209,17 +209,17 @@ def init_block(block_type, ranks=None, for_rnn=False):
         block = TCL3D
     elif block_type == "tcl":
         block = TCL
-    elif block_type == "trl":
-        block = TRL
+    # elif block_type == "trl":
+    #     block = TRL
     elif block_type == "trl-half":
         block = TRLhalf
     elif block_type == "trl3dhalf":
         block = TRL3Dhalf
     else:
         raise ValueError(
-            f'Incorrect block type: {block_type}. Should be tcl or trl')
+            f'Incorrect block type: {block_type}. Should be tcl or trl-half')
 
-    if block_type in ["trl", "trl-half", "trl3dhalf"]:
+    if block_type in ["trl-half", "trl3dhalf"]:
         assert ranks is not None, f"Ranks not provided"
         key = "ranks" if for_rnn else "core_shape"
         args[key] = ranks
@@ -265,11 +265,11 @@ def parse_bce_linear(args: Dict):
             nn.Linear(args['data_dim'], args['emb_dim'], bias=fc_bias_flag),
             nn.ReLU())
     elif args["input_block"] == "trl3dhalf":
-        layer_input = TRL3Dhalf(input_shape=(1, 1, ) + args['data_dim'],
+        layer_input = TRLhalf(input_shape=(1, 1, ) + args['data_dim'],
                                 output_shape=(1, 1, args['emb_dim']),
                                 core_shape=args['data_dim'],
+                                feature_dims=args["feature_dim"],
                                 bias_rank=fc_bias,
-                                freeze_modes=[0, 1],
                                 normalize="both")
         print(layer_input)
     else:
@@ -289,15 +289,15 @@ def parse_bce_tl(args: Dict):
         "block_type": block_type,
         "input_dims": (1, ) + input_dim,
         "hidden_dims": (1, ) + args['rnn_hid_dim'],
+        "feature_dims": args["feature_dim"],
         "bias_rank": gru_bias,
-        "freeze_modes": [0]
     }
     block_rnn = LstmTl if args["rnn_type"].lower() in ["lstm"] else GruTl
     _, args_rnn2 = init_block(block_type, args["ranks_rnn"], for_rnn=True)
     layer_rnn = block_rnn(**args_rnn, **args_rnn2)
 
     if args["output_block"] != "linear":
-        if args["output_block"] == "tcl3d":
+        if args["output_block"].startswith("tcl"):
             output_shape = (1, 1, 1, 1, 1)
         else: # args["output_block"] == "trl3dhalf"
             output_shape = (1, 1, 1)
@@ -305,7 +305,7 @@ def parse_bce_tl(args: Dict):
             "input_shape": (1, 1, ) + args['rnn_hid_dim'],
             "output_shape": output_shape,
             "bias_rank": fc_bias,
-            "freeze_modes": [0, 1],
+            "feature_dims": args["feature_dim"],
             "normalize": "in"
         }
 
@@ -324,8 +324,8 @@ def parse_bce_tl(args: Dict):
         args_in = {
             "input_shape": (1, 1, ) + args['data_dim'],
             "output_shape": (1, 1, ) + args['emb_dim'],
+            "feature_dims": args["feature_dim"],
             "bias_rank": fc_bias,
-            "freeze_modes": [0, 1],
             "normalize": "both"
         }
         block_input, args_in2 = init_block(args["input_block"],
