@@ -72,31 +72,25 @@ class TCL3D(nn.Module):
         self,
         input_shape,
         output_shape,
-        feature_dims=3,
         bias_rank=1,
         normalize="both",
         method="no_einsum",
     ) -> None:
         super().__init__()
 
-        self.fdim = feature_dims
+        self.fdim = len(input_shape)
         self.bias_rank = bias_rank
         self.method = method
         self.normalize = normalize
 
         n, m = len(input_shape), len(output_shape)
-        # l_fm = n - self.fdim
-        # assert (
-        #     n == m and self.fdim == 3 and np.all(np.array(self.freeze_modes) < l_nfm)
-        # ), f"Some shape is incorrect: input {n} != output {m}, skip modes should go first {self.l_fm}"
+        assert n == m, f"Some shape is incorrect: input {n} != output {m}"
 
         if method == "einsum":
             self.factors = nn.ParameterList(
                 [
                     nn.Parameter(torch.randn((size_in, size_out)))
-                    for size_in, size_out in zip(
-                        input_shape[-self.fdim:], output_shape[-self.fdim:]
-                    )
+                    for size_in, size_out in zip(input_shape, output_shape)
                 ]
             )
             self.rule = f"...abc,ad,be,cf->...def"
@@ -104,18 +98,16 @@ class TCL3D(nn.Module):
             self.factors = nn.ModuleList(
                 [
                     nn.Linear(size_in, size_out, bias=False)
-                    for size_in, size_out in zip(
-                        input_shape[-self.fdim:], output_shape[-self.fdim:]
-                    )
+                    for size_in, size_out in zip(input_shape, output_shape)
                 ]
             )
 
-        self.bias, self.bias_list = initialize_bias(output_shape[-self.fdim:], bias_rank)
+        self.bias, self.bias_list = initialize_bias(output_shape, bias_rank)
 
         if self.normalize in ["both", "in"]:
-            self.norm_in  = nn.LayerNorm(input_shape[-self.fdim:])
+            self.norm_in  = nn.LayerNorm(input_shape)
         if self.normalize in ["both", "out"]:
-            self.norm_out = nn.LayerNorm(output_shape[-self.fdim:])
+            self.norm_out = nn.LayerNorm(output_shape)
 
     def forward(self, x) -> torch.Tensor:
 
@@ -140,7 +132,6 @@ class TCL(nn.Module):
         self,
         input_shape,
         output_shape,
-        feature_dims,
         bias_rank=1,
         normalize="both",
     ) -> None:
@@ -149,23 +140,21 @@ class TCL(nn.Module):
         self.normalize = normalize
         self.bias_rank = bias_rank
 
-        self.fdim = feature_dims
 
         n, m = len(input_shape), len(output_shape)
-        assert n == m and n < 12, f"Some shape is incorrect: input {n} != output {m}"
+        assert n == m, f"Some shape is incorrect: input {n} != output {m}"
 
         self.factors = nn.ParameterList(
             [
                 nn.Parameter(torch.randn((size_in, size_out)))
-                for s, (size_in, size_out) in enumerate(zip(
-                    input_shape[-self.fdim:], output_shape[-self.fdim:]))
+                for size_in, size_out in zip(input_shape, output_shape)
             ]
         )
 
-        self.bias, self.bias_list = initialize_bias(output_shape[-self.fdim:], bias_rank)
+        self.bias, self.bias_list = initialize_bias(output_shape, bias_rank)
 
-        chars_inner = string.ascii_lowercase[:self.fdim]
-        chars_outer = string.ascii_lowercase[self.fdim:2 * self.fdim]
+        chars_inner = string.ascii_lowercase[:n]
+        chars_outer = string.ascii_lowercase[n:2 * n]
         chars_middle = [i + j for i, j in zip(chars_inner, chars_outer)]
 
         self.rule = (
@@ -176,9 +165,9 @@ class TCL(nn.Module):
         print(f'TCL: {self.rule}', input_shape, output_shape)
 
         if self.normalize in ["both", "in"]:
-            self.norm_in  = nn.LayerNorm(input_shape[-self.fdim:])
+            self.norm_in  = nn.LayerNorm(input_shape)
         if self.normalize in ["both", "out"]:
-            self.norm_out = nn.LayerNorm(output_shape[-self.fdim:])
+            self.norm_out = nn.LayerNorm(output_shape)
 
 
     def forward(self, x) -> torch.Tensor:
@@ -200,7 +189,6 @@ class TRLhalf(nn.Module):
         input_shape,
         output_shape,
         core_shape,
-        feature_dims,
         bias_rank=0,
         normalize="both",
     ) -> None:
@@ -209,28 +197,23 @@ class TRLhalf(nn.Module):
         self.normalize = normalize
         self.bias_rank = bias_rank
 
-        self.fdim = feature_dims
-        self.l_fm = len(input_shape) - self.fdim
         n, m, l = len(input_shape), len(output_shape), len(core_shape)
-        # l_nfm = n - self.l_fm
-        # assert l_nfm == l and l < 12, (
-        #     f""
-        #     f"Some shape is incorrect: input {n} + output{m} != core {l} + 2 freeze_modes {self.l_fm}"
-        # )
+        assert n == l, \
+            f"Some shape is incorrect: input {n} + output{m} != core {l}"
 
         self.factors_inner = nn.ParameterList(
             [
                 nn.Parameter(torch.randn((size_in, size_out)))
-                for size_in, size_out in zip(input_shape[-self.fdim:], core_shape)
+                for size_in, size_out in zip(input_shape, core_shape)
             ]
         )
 
-        self.core = nn.Parameter(torch.randn(*core_shape, *output_shape[self.l_fm:]))
-        self.bias, self.bias_list = initialize_bias(output_shape[self.l_fm:], bias_rank)
+        self.core = nn.Parameter(torch.randn(*core_shape, *output_shape))
+        self.bias, self.bias_list = initialize_bias(output_shape, bias_rank)
 
-        chars_inner = string.ascii_lowercase[:self.fdim]
-        chars_core = string.ascii_lowercase[self.fdim:2 * self.fdim]
-        chars_final = string.ascii_lowercase[2 * self.fdim:2 * self.fdim + m - self.l_fm]
+        chars_inner = string.ascii_lowercase[:n]
+        chars_core = string.ascii_lowercase[n:2 * n]
+        chars_final = string.ascii_lowercase[2 * n:2 * n + m]
         chars_middle = [i + j for i, j in zip(chars_inner, chars_core)]
 
         self.rule = (
@@ -243,9 +226,9 @@ class TRLhalf(nn.Module):
         print(f'TRL: {self.rule}')
 
         if self.normalize in ["both", "in"]:
-            self.norm_in  = nn.LayerNorm(input_shape[-self.fdim:])
+            self.norm_in  = nn.LayerNorm(input_shape)
         if self.normalize in ["both", "out"]:
-            self.norm_out = nn.LayerNorm(output_shape[self.l_fm:])
+            self.norm_out = nn.LayerNorm(output_shape)
 
     def forward(self, x) -> torch.Tensor:
 
@@ -264,43 +247,41 @@ class TRLhalf(nn.Module):
 
 class TRL3Dhalf(nn.Module):
 
-    def __init__(self, input_shape, output_shape, core_shape, feature_dims, bias_rank=1, normalize="both", method="no_einsum") -> None:
+    def __init__(self, input_shape, output_shape, core_shape, bias_rank=1, normalize="both", method="no_einsum") -> None:
         super().__init__()
 
-        self.fdim = feature_dims
-        self.l_fm = len(input_shape) - self.fdim
         self.bias_rank = bias_rank
         self.method = method
         self.normalize = normalize
         self.core_in_features = np.prod(core_shape)
-        self.core_out_features = tuple(output_shape[self.l_fm:])
+        self.core_out_features = output_shape
+        self.fdim = len(input_shape)
 
         n, m, l = len(input_shape), len(output_shape), len(core_shape)
-        # l_nfm = n - self.l_fm
-        # assert l_nfm == l and l < 12, f'' \
-        #     f'Some shape is incorrect: input {n} + output {m} != core {l} + 2 freeze_modes {self.l_fm}'
+        assert n == l, \
+            f'Some shape is incorrect: input {n} + output {m} != core {l}'
 
         if method == "einsum":
             self.factors = nn.ParameterList([
                 nn.Parameter(torch.randn((size_in, size_out)))
-                for size_in, size_out in zip(input_shape[-self.fdim:], core_shape)
+                for size_in, size_out in zip(input_shape, core_shape)
             ])
-            self.core = nn.Parameter(torch.randn(*core_shape, *output_shape[self.l_fm:]))
-            self.rule = f'...abc,ad,be,cf,defghk->...ghk'
-            print(f'TCL: {self.rule}', input_shape, output_shape)
+            self.core = nn.Parameter(torch.randn(*core_shape, *output_shape))
+            self.rule = f'...abc,ad,be,cf,defghk->...ghk'  # FIXME not correct for input block
+            print(f'TRL3D: {self.rule}', input_shape, output_shape)
         else:
             self.factors = nn.ModuleList([
                 nn.Linear(size_in, size_out, bias=False)
-                for size_in, size_out in zip(input_shape[-self.fdim:], core_shape)
+                for size_in, size_out in zip(input_shape, core_shape)
             ])
             self.core = nn.Linear(self.core_in_features, np.prod(self.core_out_features), bias=False)
 
-        self.bias, self.bias_list = initialize_bias(output_shape[self.l_fm:], bias_rank)
+        self.bias, self.bias_list = initialize_bias(output_shape, bias_rank)
 
         if self.normalize in ["both", "in"]:
-            self.norm_in  = nn.LayerNorm(input_shape[-self.fdim:])
+            self.norm_in  = nn.LayerNorm(input_shape)
         if self.normalize in ["both", "out"]:
-            self.norm_out = nn.LayerNorm(output_shape[self.l_fm:])
+            self.norm_out = nn.LayerNorm(output_shape)
 
     def forward(self, x) -> torch.Tensor:
 

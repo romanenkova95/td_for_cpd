@@ -12,7 +12,6 @@ class GruTl(nn.Module):
             block_type: str,
             input_dims: Tuple[int, int, int],
             hidden_dims: int,
-            feature_dims: int,
             ranks = None,
             bias_rank = False,
             batch_first=True
@@ -43,7 +42,6 @@ class GruTl(nn.Module):
                     input_dims,
                     hidden_dims,
                     **args,
-                    feature_dims=feature_dims,
                     bias_rank=bias_rank,
                 )
                 for _ in range(3)
@@ -56,7 +54,6 @@ class GruTl(nn.Module):
                     hidden_dims,
                     hidden_dims,
                     **args,
-                    feature_dims=feature_dims,
                     bias_rank=bias_rank,
                 )
                 for _ in range(3)
@@ -74,7 +71,7 @@ class GruTl(nn.Module):
 
         outputs = []
         if h_prev is None:
-            h_prev = torch.zeros(N, *self.hidden_dims[1:]).to(inputs)
+            h_prev = torch.zeros(N, *self.hidden_dims).to(inputs)
 
         for x_t in inputs:
             x_z, x_r, x_h = [linear(x_t) for linear in self.linear_w]
@@ -101,7 +98,7 @@ class GruTl(nn.Module):
 class LstmTl(nn.Module):
 
     # TODO add num_layers parameter
-    def __init__(self, block_type, input_dims, hidden_dims, feature_dims, ranks=None, bias_rank=False, batch_first=True):
+    def __init__(self, block_type, input_dims, hidden_dims, ranks=None, bias_rank=False, batch_first=True):
         super().__init__()
 
         self.hidden_dims = hidden_dims
@@ -121,11 +118,11 @@ class LstmTl(nn.Module):
             raise ValueError(f'Incorrect block type: {block_type}. Should be tcl or trl-half')
 
         self.linear_w = nn.ModuleList([
-            block(input_dims, hidden_dims, **args, feature_dims=feature_dims, bias_rank=bias_rank)
+            block(input_dims, hidden_dims, **args, bias_rank=bias_rank)
             for _ in range(4)])
 
         self.linear_u = nn.ModuleList([
-            block(hidden_dims, hidden_dims, **args, feature_dims=feature_dims, bias_rank=bias_rank)
+            block(hidden_dims, hidden_dims, **args, bias_rank=bias_rank)
             for _ in range(4)])
 
 
@@ -140,12 +137,13 @@ class LstmTl(nn.Module):
 
         outputs = []
         if init_states is None:
-            h_prev = torch.zeros(N, *self.hidden_dims[1:]).to(inputs)
-            c_prev = torch.zeros(N, *self.hidden_dims[1:]).to(inputs)
+            h_prev = torch.zeros(N, *self.hidden_dims).to(inputs)
+            c_prev = torch.zeros(N, *self.hidden_dims).to(inputs)
         else:
             h_prev, c_prev = init_states
 
         for x_t in inputs:
+            # print(self.linear_u)
             x_z, x_r, x_h, x_c = [linear(x_t) for linear in self.linear_w]
             h_z, h_r, h_h, h_c = [linear(h_prev) for linear in self.linear_u]
 
@@ -265,10 +263,9 @@ def parse_bce_linear(args: Dict):
             nn.Linear(args['data_dim'], args['emb_dim'], bias=fc_bias_flag),
             nn.ReLU())
     elif args["input_block"] == "trl3dhalf":
-        layer_input = TRLhalf(input_shape=(1, 1, ) + args['data_dim'],
-                                output_shape=(1, 1, args['emb_dim']),
+        layer_input = TRLhalf(input_shape=args['data_dim'],
+                                output_shape=(args['emb_dim'],),
                                 core_shape=args['data_dim'],
-                                feature_dims=args["feature_dim"],
                                 bias_rank=fc_bias,
                                 normalize="both")
         print(layer_input)
@@ -287,9 +284,8 @@ def parse_bce_tl(args: Dict):
     input_dim = args['data_dim'] if not has_input_block else args['emb_dim']
     args_rnn = {
         "block_type": block_type,
-        "input_dims": (1, ) + input_dim,
-        "hidden_dims": (1, ) + args['rnn_hid_dim'],
-        "feature_dims": args["feature_dim"],
+        "input_dims": input_dim,
+        "hidden_dims": args['rnn_hid_dim'],
         "bias_rank": gru_bias,
     }
     block_rnn = LstmTl if args["rnn_type"].lower() in ["lstm"] else GruTl
@@ -298,14 +294,13 @@ def parse_bce_tl(args: Dict):
 
     if args["output_block"] != "linear":
         if args["output_block"].startswith("tcl"):
-            output_shape = (1, 1, 1, 1, 1)
-        else: # args["output_block"] == "trl3dhalf"
             output_shape = (1, 1, 1)
+        else: # args["output_block"] == "trl3dhalf"
+            output_shape = (1,)
         args_out = {
-            "input_shape": (1, 1, ) + args['rnn_hid_dim'],
+            "input_shape": args['rnn_hid_dim'],
             "output_shape": output_shape,
             "bias_rank": fc_bias,
-            "feature_dims": args["feature_dim"],
             "normalize": "in"
         }
 
@@ -322,9 +317,8 @@ def parse_bce_tl(args: Dict):
                       bias=fc_bias))
     if has_input_block:
         args_in = {
-            "input_shape": (1, 1, ) + args['data_dim'],
-            "output_shape": (1, 1, ) + args['emb_dim'],
-            "feature_dims": args["feature_dim"],
+            "input_shape": args['data_dim'],
+            "output_shape": args['emb_dim'],
             "bias_rank": fc_bias,
             "normalize": "both"
         }

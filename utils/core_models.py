@@ -149,42 +149,37 @@ class KlcpdGenTl(nn.Module):
         self.rnn_hid_dims = args["rnn_hid_dim"]
         self.emb_dims = args["emb_dim"]
         self.relu = nn.ReLU()
-        feature_dims = args["feature_dim"] 
 
         fc_bias, gru_bias = init_bias(args)
         block, (args_in, args_gru, args_out) = init_fc_rnn_tl(block_type, args)
 
         self.emb_layer = block(
-            (1, 1,) + args["data_dim"],
-            (1, 1,) + self.emb_dims,
+            args["data_dim"],
+            self.emb_dims,
             bias_rank=fc_bias,
-            feature_dims=feature_dims,
             **args_in
         )
 
         self.rnn_enc_layer = GruTl(
             block_type,
-            (1,) + self.emb_dims,
-            (1,) + self.rnn_hid_dims,
+            self.emb_dims,
+            self.rnn_hid_dims,
             bias_rank=gru_bias,
-            feature_dims=feature_dims,
             **args_gru
         )
 
         self.rnn_dec_layer = GruTl(
             block_type,
-            (1,) + self.emb_dims,
-            (1,) + self.rnn_hid_dims,
+            self.emb_dims,
+            self.rnn_hid_dims,
             bias_rank=gru_bias,
-            feature_dims=feature_dims,
             **args_gru
         )
 
         self.output_layer = block(
-            (1, 1,) + self.rnn_hid_dims,
-            (1, 1,) + args["data_dim"],
+            self.rnn_hid_dims,
+            args["data_dim"],
             bias_rank=fc_bias,
-            feature_dims=feature_dims,
             **args_out
         )
 
@@ -235,42 +230,37 @@ class KlcpdDiscTl(nn.Module):
         self.emb_dims = args["emb_dim"]
         self.relu = nn.ReLU()
         self.data_dim = args["data_dim"]
-        feature_dims = args["feature_dim"] 
 
         fc_bias, gru_bias = init_bias(args)
         block, (args_in, args_gru, args_out) = init_fc_rnn_tl(block_type, args)
 
         self.emb_layer = block(
-            (1, 1,) + self.data_dim,
-            (1, 1,) + self.emb_dims,
+            self.data_dim,
+            self.emb_dims,
             bias_rank=fc_bias,
-            feature_dims=feature_dims,
             **args_in
         )
 
         self.rnn_enc_layer = GruTl(
             block_type,
-            (1,) + self.emb_dims,
-            (1,) + self.rnn_hid_dims,
+            self.emb_dims,
+            self.rnn_hid_dims,
             bias_rank=gru_bias,
-            feature_dims=feature_dims,
             **args_gru
         )
 
         self.rnn_dec_layer = GruTl(
             block_type,
-            (1,) + self.rnn_hid_dims,
-            (1,) + self.emb_dims,
+            self.rnn_hid_dims,
+            self.emb_dims,
             bias_rank=gru_bias,
-            feature_dims=feature_dims,
             **args_gru
         )
 
         self.output_layer = block(
-            (1, 1,) + self.emb_dims,
-            (1, 1,) + self.data_dim,
+            self.emb_dims,
+            self.data_dim,
             bias_rank=fc_bias,
-            feature_dims=feature_dims,
             **args_out
         )
 
@@ -351,26 +341,23 @@ class BceRNNTl(nn.Module):
         self.emb_dims = args["emb_dim"]
         self.relu = nn.ReLU()
         self.data_dim = args["data_dim"]
-        feature_dims = args["feature_dim"] 
 
         fc_bias, rnn_bias = init_bias(args)
         block, (args_in, args_rnn, args_out) = init_fc_rnn_tl(block_type, args)
 
         self.rnn = GruTl(
             block_type,
-            (1,) + self.data_dim,
-            (1,) + self.rnn_hid_dims,
+            self.data_dim,
+            self.rnn_hid_dims,
             bias_rank=rnn_bias,
-            feature_dims=feature_dims,
             batch_first=True,
             **args_rnn
         )
 
         self.output_layer = block(
-            (1, 1,) + self.rnn_hid_dims,
-            (1, 1,) + (1, 1, 1),
+            self.rnn_hid_dims,
+            (1, 1, 1),
             bias_rank=fc_bias,
-            feature_dims=feature_dims,
             normalize="in",
             **args_out
         )

@@ -58,8 +58,7 @@ def get_args(parser):
     args = {}
     copy_keys = [
         "model", "seed", "experiments_name", "epochs", "lr", "dryrun",
-        "bias_rank", "block_type", "rnn_type", "input_block", "output_block", 
-        "feature_dim"
+        "bias_rank", "block_type", "rnn_type", "input_block", "output_block"
     ]
 
     for key in copy_keys:
