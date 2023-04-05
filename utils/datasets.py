@@ -523,4 +523,5 @@ class SyntheticNormalDataset(Dataset):
             
             data.append(x)
             labels.append(label)
+
         return data, labels

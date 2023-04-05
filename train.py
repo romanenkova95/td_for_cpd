@@ -42,6 +42,7 @@ def get_parser():
                         help='Max number of epochs to train')
     parser.add_argument("--bias-rank", type=int, default=4, 
                         help='bias rank in TCL')
+    parser.add_argument("--data-dim", type=str, help='GRU embedding dim')
     parser.add_argument("--emb-dim", type=str, help='GRU embedding dim')
     parser.add_argument("--hid-dim", type=str, help='GRU hidden dim')
     parser.add_argument("--input-ranks", type=str, help='GRU hidden dim')
@@ -51,7 +52,7 @@ def get_parser():
     parser.add_argument("--experiments-name", type=str, 
                         default="road_accidents", 
                         help='name of dataset', 
-                        choices=["explosion", "road_accidents", "synthetic_2D"])
+                        choices=["explosion", "road_accidents", "synthetic_2D", "synthetic_32D"])
     parser.add_argument("--patience", type=int, default=10, 
                         help="Patience for early stopping")
     parser.add_argument("--lr", type=float, default=1e-3, 

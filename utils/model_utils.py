@@ -3,6 +3,13 @@ import torch
 from . import core_models, cpd_models as models
 from .core_models import fix_seeds
 
+class TransposeLast2D(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return x.transpose(-1, -2)
+
 def str2tuple(str_value: Optional[str]) -> Optional[Union[Tuple[int], int]]:
 
     if str_value is not None:
@@ -57,7 +64,7 @@ def get_args(parser):
     args_local_dict = dict(vars(args_local))
     args = {}
     copy_keys = [
-        "model", "seed", "experiments_name", "epochs", "lr", "dryrun",
+        "model", "seed", "experiments_name", "epochs", "lr", "dryrun", "data_dim",
         "bias_rank", "block_type", "rnn_type", "input_block", "output_block"
     ]
 
@@ -73,13 +80,18 @@ def get_args(parser):
     if args["output_block"] == "same":
         args["output_block"] = args["block_type"]
 
-    if args["block_type"] == "linear" and \
-       args["input_block"] in ["none", "linear"]:
+    if not args["experiments_name"].startswith("synthetic"):
+        if  args["block_type"] == "linear" and \
+            args["input_block"] in ["none", "linear"]:
 
-        args['data_dim'] = 12288
+            args['data_dim'] = 12288
+        else:
+            args['data_dim'] = (192, 8, 8)
     else:
-        args['data_dim'] = (192, 8, 8)
-
+        assert args['data_dim'] == args["experiments_name"].split("_")[1][:-1], \
+            f'Cannot match D for synthetic dataset: {args["data_dim"]} != {args["experiments_name"]}'
+        args['data_dim'] = int(args['data_dim'])
+    
     args['rnn_hid_dim'] = str2tuple(args_local.hid_dim)
     args['emb_dim'] = str2tuple(args_local.emb_dim)
     lin_types = ["linear", "masked"]
@@ -200,7 +212,8 @@ def get_model(args,
         extractor = torch.nn.Sequential(*list(extractor.blocks[:5]))
 
     if args["experiments_name"].startswith("synthetic"):
-        extractor = torch.nn.Identity()
+        # NOTE reshape to fix video extractor
+        extractor = TransposeLast2D()
 
     if add_param_numel_to_args:
         args["extractor_params"] = count_params(extractor)
