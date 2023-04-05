@@ -36,6 +36,19 @@ def forward_tcl_3d(x, factors, feature_dims=3):
 
     return y
 
+def forward_tcl_Nd(x, factors, feature_dims):
+
+    N = x.ndim
+    y = x
+    for i in range(feature_dims):
+        y = factors[feature_dims-i-1](y.transpose(N-i-1, -1))
+
+    nfm = N - feature_dims
+    arange_fm = np.arange(nfm, N)
+    y = y.permute(*np.arange(nfm), arange_fm[-1], *arange_fm[:-1])
+
+    return y
+
 
 def add_bias_3d(bias, bias_rank, bias_list):
     y = 0
@@ -74,7 +87,7 @@ class TCL3D(nn.Module):
         output_shape,
         bias_rank=1,
         normalize="both",
-        method="no_einsum",
+        method="no_einsum"
     ) -> None:
         super().__init__()
 
@@ -134,22 +147,32 @@ class TCL(nn.Module):
         output_shape,
         bias_rank=1,
         normalize="both",
+        method="no_einsum"
     ) -> None:
         super().__init__()
 
+        self.fdim = len(input_shape)
         self.normalize = normalize
         self.bias_rank = bias_rank
-
+        self.method = method
 
         n, m = len(input_shape), len(output_shape)
         assert n == m, f"Some shape is incorrect: input {n} != output {m}"
 
-        self.factors = nn.ParameterList(
-            [
-                nn.Parameter(torch.randn((size_in, size_out)))
-                for size_in, size_out in zip(input_shape, output_shape)
-            ]
-        )
+        if method == "einsum":
+            self.factors = nn.ParameterList(
+                [
+                    nn.Parameter(torch.randn((size_in, size_out)))
+                    for size_in, size_out in zip(input_shape, output_shape)
+                ]
+            )
+        else:
+            self.factors = nn.ModuleList(
+                [
+                    nn.Linear(size_in, size_out, bias=False)
+                    for size_in, size_out in zip(input_shape, output_shape)
+                ]
+            )
 
         self.bias, self.bias_list = initialize_bias(output_shape, bias_rank)
 
@@ -174,7 +197,13 @@ class TCL(nn.Module):
 
         if self.normalize in ["both", "in"]:
             x = self.norm_in(x)
-        y = torch.einsum(self.rule, x, *self.factors)
+
+        if self.method == "einsum":
+            y = torch.einsum(self.rule, x, *self.factors)
+        else:
+            y = forward_tcl_Nd(x, self.factors, self.fdim)
+
+
         y += add_bias_Nd(self.bias, self.bias_rank, self.bias_list)
 
         if self.normalize in ["both", "out"]:
@@ -191,40 +220,52 @@ class TRLhalf(nn.Module):
         core_shape,
         bias_rank=0,
         normalize="both",
+        method="no_einsum"
     ) -> None:
         super().__init__()
 
         self.normalize = normalize
         self.bias_rank = bias_rank
+        self.method = method
+        self.fdim = len(input_shape)
+        self.core_in_features = np.prod(core_shape)
+        self.core_out_features = output_shape
 
         n, m, l = len(input_shape), len(output_shape), len(core_shape)
         assert n == l, \
             f"Some shape is incorrect: input {n} + output{m} != core {l}"
 
-        self.factors_inner = nn.ParameterList(
-            [
-                nn.Parameter(torch.randn((size_in, size_out)))
+        if method == "einsum":
+            self.factors_inner = nn.ParameterList(
+                [
+                    nn.Parameter(torch.randn((size_in, size_out)))
+                    for size_in, size_out in zip(input_shape, core_shape)
+                ]
+            )
+
+            self.core = nn.Parameter(torch.randn(*core_shape, *output_shape))
+
+            chars_inner = string.ascii_lowercase[:n]
+            chars_core = string.ascii_lowercase[n:2 * n]
+            chars_final = string.ascii_lowercase[2 * n:2 * n + m]
+            chars_middle = [i + j for i, j in zip(chars_inner, chars_core)]
+
+            self.rule = (
+                f"...{chars_inner},"
+                f'{",".join(chars_middle)}'
+                f',{"".join(chars_core)}{chars_final}'
+                f'->...{chars_final}'
+            )
+
+            print(f'TRL: {self.rule}')
+        else:
+            self.factors = nn.ModuleList([
+                nn.Linear(size_in, size_out, bias=False)
                 for size_in, size_out in zip(input_shape, core_shape)
-            ]
-        )
+            ])
+            self.core = nn.Linear(self.core_in_features, np.prod(self.core_out_features), bias=False)
 
-        self.core = nn.Parameter(torch.randn(*core_shape, *output_shape))
         self.bias, self.bias_list = initialize_bias(output_shape, bias_rank)
-
-        chars_inner = string.ascii_lowercase[:n]
-        chars_core = string.ascii_lowercase[n:2 * n]
-        chars_final = string.ascii_lowercase[2 * n:2 * n + m]
-        chars_middle = [i + j for i, j in zip(chars_inner, chars_core)]
-
-        self.rule = (
-            f"...{chars_inner},"
-            f'{",".join(chars_middle)}'
-            f',{"".join(chars_core)}{chars_final}'
-            f'->...{chars_final}'
-        )
-
-        print(f'TRL: {self.rule}')
-
         if self.normalize in ["both", "in"]:
             self.norm_in  = nn.LayerNorm(input_shape)
         if self.normalize in ["both", "out"]:
@@ -232,11 +273,19 @@ class TRLhalf(nn.Module):
 
     def forward(self, x) -> torch.Tensor:
 
+        freeze_shape = tuple(x.shape[:-self.fdim])
         if self.normalize in ["both", "in"]:
             x = self.norm_in(x)
 
-        # print(f'TRL forward: {self.rule}, X shape: {x.shape}, {len(self.factors_inner)}, {self.core.shape}')
-        y = torch.einsum(self.rule, x, *self.factors_inner, self.core)
+        if self.method == "einsum":
+            # print(f'TRL forward: {self.rule}, X shape: {x.shape}, {len(self.factors_inner)}, {self.core.shape}')
+            y = torch.einsum(self.rule, x, *self.factors_inner, self.core)
+        else:
+            y = forward_tcl_Nd(x, self.factors, self.fdim)
+            y = y.reshape(*freeze_shape, self.core_in_features)
+            y = self.core(y)
+            y = y.reshape(*freeze_shape, *self.core_out_features)
+
         y += add_bias_Nd(self.bias, self.bias_rank, self.bias_list)
 
         if self.normalize in ["both", "out"]:
