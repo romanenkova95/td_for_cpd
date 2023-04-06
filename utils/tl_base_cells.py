@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from .tensor_layers import TCL, TCL3D, TRLhalf, TRL3Dhalf
+from .tensor_layers import TCL, TCL3D, TRLhalf, TRL3Dhalf, TT
 
 
 class GruTl(nn.Module):
@@ -21,16 +21,18 @@ class GruTl(nn.Module):
         self.hidden_dims = hidden_dims
         self.batch_first = batch_first
 
-        if block_type.lower() == "tcl3d":
+        if block_type == "tcl3d":
             block, args = TCL3D, {}
-        elif block_type.lower() == "tcl":
+        elif block_type == "tcl":
             block, args = TCL, {}
-        # elif block_type.lower() == "trl":
+        # elif block_type == "trl":
         #     block, args = TRL, {"core_shape": ranks}
-        elif block_type.lower() == "trl-half":
+        elif block_type == "trl-half":
             block, args = TRLhalf, {"core_shape": ranks}
-        elif block_type.lower() == "trl3dhalf":
+        elif block_type == "trl3dhalf":
             block, args = TRL3Dhalf, {"core_shape": ranks}
+        elif block_type == "tt":
+            block, args = TT, {"ranks": ranks}
         else:
             raise ValueError(
                 f"Incorrect block type: {block_type}. Should be tcl or trl"
@@ -104,16 +106,18 @@ class LstmTl(nn.Module):
         self.hidden_dims = hidden_dims
         self.batch_first = batch_first
 
-        if block_type.lower() == "tcl3d":
+        if block_type == "tcl3d":
             block, args = TCL3D, {}
-        elif block_type.lower() == "tcl":
+        elif block_type == "tcl":
             block, args = TCL, {}
-        # elif block_type.lower() == "trl":
+        # elif block_type == "trl":
         #     block, args = TRL, {"core_shape": ranks}
-        elif block_type.lower() == "trl-half":
+        elif block_type == "trl-half":
             block, args = TRLhalf, {"core_shape": ranks}
-        elif block_type.lower() == "trl3dhalf":
+        elif block_type == "trl3dhalf":
             block, args = TRL3Dhalf, {"core_shape": ranks}
+        elif block_type == "tt":
+            block, args = TT, {"ranks": ranks}
         else:
             raise ValueError(f'Incorrect block type: {block_type}. Should be tcl or trl-half')
 
@@ -187,6 +191,8 @@ def init_fc_rnn_tl(block_type, args):
         block = TRLhalf
     elif block_type == "trl3dhalf":
         block = TRL3Dhalf
+    elif block_type == "tt":
+        block = TT
     else:
         raise ValueError(
             f'Incorrect block type: {block_type}. Should be tcl or trl-half')
@@ -195,6 +201,11 @@ def init_fc_rnn_tl(block_type, args):
         args_in["core_shape"] = args["ranks_input"]
         args_rnn["ranks"] = args["ranks_rnn"]
         args_out["core_shape"] = args["ranks_output"]
+
+    elif block_type == "tt":
+        args_in["ranks"] = args["ranks_input"]
+        args_rnn["ranks"] = args["ranks_rnn"]
+        args_out["ranks"] = args["ranks_output"]
 
     return block, (args_in, args_rnn, args_out)
 
@@ -212,7 +223,10 @@ def init_block(block_type, ranks=None, for_rnn=False):
     elif block_type == "trl-half":
         block = TRLhalf
     elif block_type == "trl3dhalf":
-        block = TRL3Dhalf
+        block = TRL3Dhalf    
+    elif block_type == "tt":
+        block = TT
+
     else:
         raise ValueError(
             f'Incorrect block type: {block_type}. Should be tcl or trl-half')
@@ -221,6 +235,10 @@ def init_block(block_type, ranks=None, for_rnn=False):
         assert ranks is not None, f"Ranks not provided"
         key = "ranks" if for_rnn else "core_shape"
         args[key] = ranks
+
+    elif block_type == "tt":
+        assert ranks is not None, f"Ranks not provided"
+        args["ranks"] = ranks
 
     return block, args
 
@@ -293,7 +311,7 @@ def parse_bce_tl(args: Dict):
     layer_rnn = block_rnn(**args_rnn, **args_rnn2)
 
     if args["output_block"] != "linear":
-        if args["output_block"].startswith("tcl"):
+        if args["output_block"].startswith("tcl") or args["output_block"] == "tt":
             output_shape = (1, 1, 1)
         else: # args["output_block"] == "trl3dhalf"
             output_shape = (1,)

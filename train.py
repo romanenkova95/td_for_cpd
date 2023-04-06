@@ -20,7 +20,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 import argparse
 
-possible_blocks = ["linear", "tcl3d", "trl3dhalf", "tcl", "trl-half"]
+possible_blocks = ["linear", "tcl3d", "trl3dhalf", "tcl", "trl-half", "tt"]
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Test your model')

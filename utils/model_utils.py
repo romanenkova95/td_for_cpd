@@ -44,6 +44,11 @@ default_values = {
         "ranks_input": (192, 8, 8),
         "ranks_output": (8, 4, 4),
         "ranks_rnn": (8, 4, 4)
+    },
+    "tt": {
+        "ranks_input": (32, 32),
+        "ranks_output": (8, 8),
+        "ranks_rnn": (16, 16)
     }
 }
 
@@ -99,24 +104,26 @@ def get_args(parser):
     check_default(args, block_type, ["rnn_hid_dim", "emb_dim"])
 
 
-    if args["block_type"] in ["trl", "trl-half", "trl3dhalf"]:
+    if args["block_type"] in ["trl", "trl-half", "trl3dhalf", "tt"]:
         args['ranks_input'] = str2tuple(args_local.input_ranks)
         args['ranks_rnn'] = str2tuple(args_local.rnn_ranks)
         args['ranks_output'] = str2tuple(args_local.output_ranks)
         check_default(args, args["block_type"],
                       ["ranks_input", "ranks_rnn", "ranks_output"])
+
+    # FIXME why do we set to None?
     args['ranks_input'] = None
     args['ranks_rnn'] = None
     args['ranks_output'] = None
-    if args["input_block"] in ["trl", "trl-half", "trl3dhalf"]:
+    if args["input_block"] in ["trl", "trl-half", "trl3dhalf", "tt"]:
         args['ranks_input'] = str2tuple(args_local.input_ranks)
         check_default(args, args["input_block"],"ranks_input")
 
-    if args["block_type"] in ["trl", "trl-half", "trl3dhalf"]:
+    if args["block_type"] in ["trl", "trl-half", "trl3dhalf", "tt"]:
         args['ranks_rnn'] = str2tuple(args_local.rnn_ranks)
         check_default(args, args["block_type"], "ranks_rnn")
 
-    if args["output_block"] in ["trl", "trl-half", "trl3dhalf"]:
+    if args["output_block"] in ["trl", "trl-half", "trl3dhalf", "tt"]:
         args['ranks_output'] = str2tuple(args_local.output_ranks)
         check_default(args, args["output_block"], "ranks_output")
 
@@ -137,7 +144,7 @@ def get_args(parser):
 
 def get_bce_args(args_local):
 
-    assert args_local.block_type in ["tcl3d", "trl3dhalf", "linear", "tcl", "trl-half"], \
+    assert args_local.block_type in ["tcl3d", "trl3dhalf", "linear", "tcl", "trl-half", "tt"], \
         f'BCE model supports only tcl*, trl* and linear blocks'
 
     args = {}
@@ -155,7 +162,7 @@ def get_bce_args(args_local):
 def get_kl_cpd_args(args_local):
 
     assert args_local.block_type in [
-        "tcl3d", "tcl", "trl", "linear", "trl-half", "trl3dhalf", "masked"
+        "tcl3d", "tcl", "trl", "linear", "trl-half", "trl3dhalf", "masked", "tt"
     ], f'KL-CPD model supports only these blocks'
 
 
@@ -181,7 +188,7 @@ def get_kl_cpd_args(args_local):
                                            patience=args_local.patience)
 
 
-    if args_local.block_type in ["trl", "trl-half", "trl3dhalf"]:
+    if args_local.block_type in ["trl", "trl-half", "trl3dhalf", "tt"]:
         args['ranks_input'] = str2tuple(args_local.input_ranks)
         args['ranks_output'] = str2tuple(args_local.output_ranks)
         check_default(args, args_local.block_type, ["ranks_input", "ranks_output"])
