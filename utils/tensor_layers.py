@@ -218,7 +218,7 @@ class TRLhalf(nn.Module):
         input_shape,
         output_shape,
         core_shape,
-        bias_rank=0,
+        bias_rank=1,
         normalize="both",
         method="no_einsum"
     ) -> None:
@@ -236,12 +236,10 @@ class TRLhalf(nn.Module):
             f"Some shape is incorrect: input {n} + output{m} != core {l}"
 
         if method == "einsum":
-            self.factors_inner = nn.ParameterList(
-                [
-                    nn.Parameter(torch.randn((size_in, size_out)))
-                    for size_in, size_out in zip(input_shape, core_shape)
-                ]
-            )
+            self.factors = nn.ParameterList([
+                nn.Parameter(torch.randn((size_in, size_out)))
+                for size_in, size_out in zip(input_shape, core_shape)
+            ])
 
             self.core = nn.Parameter(torch.randn(*core_shape, *output_shape))
 
@@ -279,7 +277,7 @@ class TRLhalf(nn.Module):
 
         if self.method == "einsum":
             # print(f'TRL forward: {self.rule}, X shape: {x.shape}, {len(self.factors_inner)}, {self.core.shape}')
-            y = torch.einsum(self.rule, x, *self.factors_inner, self.core)
+            y = torch.einsum(self.rule, x, *self.factors, self.core)
         else:
             y = forward_tcl_Nd(x, self.factors, self.fdim)
             y = y.reshape(*freeze_shape, self.core_in_features)
@@ -353,3 +351,72 @@ class TRL3Dhalf(nn.Module):
             y = self.norm_out(y)
 
         return y
+
+def forward_tt_Nd(input, factors, tt_ranks):
+
+    N = input.ndim
+    fdim = len(tt_ranks)-1
+    y = torch.unsqueeze(input, -1)
+
+    for i in range(fdim):
+
+        y = y.transpose(N-i-1, -2)
+        shape_local = y.shape[:-2]
+        y = y.reshape(*shape_local, -1)
+        y = factors[fdim-i-1](y)
+        y = y.reshape(*shape_local, -1, tt_ranks[fdim-i-1])
+
+    y = torch.squeeze(y, -1)
+
+    nfm = N - fdim
+    arange_fm = np.arange(nfm, N)
+    y = y.permute(*np.arange(nfm), arange_fm[-1], *arange_fm[:-1])
+
+    return y
+
+
+
+class TT(nn.Module):
+
+    def __init__(self, input_shape, output_shape, ranks, bias_rank=1, normalize="both") -> None:
+        super().__init__()
+
+        self.bias_rank = bias_rank
+        self.normalize = normalize
+        self.input_shape = input_shape
+        self.output_shape = output_shape
+        self.ranks = (1,) + tuple(ranks) + (1,)
+        self.fdim = len(input_shape)
+
+        n, m, r = len(input_shape), len(output_shape), len(ranks)
+        assert n == m == r + 1, \
+            f'Some shape is incorrect: input {n} != output {m} != rank {r} + 1'
+
+        ranks_expanded = (1,) + ranks + ()
+        self.factors = nn.ModuleList([
+            nn.Linear(self.input_shape[i] * self.ranks[i+1], 
+                      self.output_shape[i] * self.ranks[i],
+                      bias=False)
+            for i in range(self.fdim)
+        ])
+
+        self.bias, self.bias_list = initialize_bias(output_shape, bias_rank)
+
+        if self.normalize in ["both", "in"]:
+            self.norm_in  = nn.LayerNorm(input_shape)
+        if self.normalize in ["both", "out"]:
+            self.norm_out = nn.LayerNorm(output_shape)
+
+    def forward(self, x) -> torch.Tensor:
+
+        if self.normalize in ["both", "in"]:
+            x = self.norm_in(x)
+
+        y = forward_tt_Nd(x, self.factors, self.ranks)
+
+        y += add_bias_Nd(self.bias, self.bias_rank, self.bias_list)
+
+        if self.normalize in ["both", "out"]:
+            y = self.norm_out(y)
+
+        return y        

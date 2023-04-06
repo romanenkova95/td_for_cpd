@@ -262,7 +262,7 @@ def parse_bce_linear(args: Dict):
             nn.Flatten(start_dim=2),
             nn.Linear(args['data_dim'], args['emb_dim'], bias=fc_bias_flag),
             nn.ReLU())
-    elif args["input_block"] == "trl3dhalf":
+    elif args["input_block"] in ["trl3dhalf", "trl-half"]:
         layer_input = TRLhalf(input_shape=args['data_dim'],
                                 output_shape=(args['emb_dim'],),
                                 core_shape=args['data_dim'],
