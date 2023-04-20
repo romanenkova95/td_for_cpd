@@ -257,8 +257,8 @@ def parse_bce_args(args: Dict):
 
 def parse_bce_linear(args: Dict):
     fc_bias, gru_bias = init_bias(args)
-    gru_bias = isinstance(gru_bias, int) and gru_bias > 0 or gru_bias == "full"
-    fc_bias_flag = isinstance(fc_bias, int) and fc_bias > 0 or fc_bias == "full"
+    gru_bias = isinstance(gru_bias, int) and gru_bias != 0 or gru_bias == "full"
+    fc_bias_flag = isinstance(fc_bias, int) and fc_bias != 0 or fc_bias == "full"
 
     has_input_block = args["input_block"] not in ["flatten", "none"]
     input_dim = args['data_dim'] if not has_input_block else args['emb_dim']
@@ -327,7 +327,7 @@ def parse_bce_tl(args: Dict):
 
         layer_output = block_output(**args_out, **args_out2)
     else:
-        fc_bias = isinstance(fc_bias, int) and fc_bias > 0 or fc_bias == "full"
+        fc_bias = isinstance(fc_bias, int) and fc_bias != 0 or fc_bias == "full"
         layer_output = nn.Sequential(
             nn.Flatten(start_dim=2),
             nn.Linear(in_features=np.prod(args['rnn_hid_dim']),
