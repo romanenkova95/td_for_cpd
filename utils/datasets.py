@@ -43,7 +43,6 @@ class CPDDatasets:
         path_to_train_annotation = ''
         path_to_test_annotation = ''
 
-        
         if self.experiments_name in ["explosion", "road_accidents"]:
             if self.experiments_name == "explosion":
                 path_to_data = "data/explosion/"

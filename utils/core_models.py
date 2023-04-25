@@ -383,7 +383,6 @@ class BceRNNTl_v2(nn.Module):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
 
         output = self.input_layer(input)
-        
         output, _ = self.rnn(output)
         output = self.output_layer(output)
         output = output.reshape(*output.shape[:2], 1)  # flatten across last 3 dim

@@ -4,7 +4,7 @@ import torch.nn as nn
 import numpy as np
 
 from .tensor_layers import TCL, TCL3D, TRLhalf, TRL3Dhalf, TT
-
+from .ln_lstm import LSTM
 
 class GruTl(nn.Module):
     def __init__(
@@ -226,7 +226,6 @@ def init_block(block_type, ranks=None, for_rnn=False):
         block = TRL3Dhalf    
     elif block_type == "tt":
         block = TT
-
     else:
         raise ValueError(
             f'Incorrect block type: {block_type}. Should be tcl or trl-half')
@@ -249,6 +248,8 @@ def parse_bce_args(args: Dict):
 
     if block_type in ["linear"]:
         layer_input, layer_rnn, layer_output = parse_bce_linear(args)
+    elif block_type in ["linear_norm"]:
+        layer_input, layer_rnn, layer_output = parse_bce_linear_ln(args)        
     else:
         layer_input, layer_rnn, layer_output = parse_bce_tl(args)
 
@@ -286,10 +287,38 @@ def parse_bce_linear(args: Dict):
                                 core_shape=args['data_dim'],
                                 bias_rank=fc_bias,
                                 normalize="both")
-        print(layer_input)
     else:
         raise ValueError(f'Incorrect block type: {args["input_block"]}. '
                          f'Should be flatten, none, linear or trl3dhalf')
+    return layer_input, layer_rnn, layer_output
+
+def parse_bce_linear_ln(args: Dict):
+    fc_bias, gru_bias = init_bias(args)
+    gru_bias = isinstance(gru_bias, int) and gru_bias != 0 or gru_bias == "full"
+    fc_bias_flag = isinstance(fc_bias, int) and fc_bias != 0 or fc_bias == "full"
+
+    has_input_block = args["input_block"] not in ["none"]
+    input_dim = args['data_dim'] if not has_input_block else args['emb_dim']
+
+    block_rnn = LSTM
+
+    layer_rnn = block_rnn(input_size=input_dim,
+                          hidden_size=args['rnn_hid_dim'],
+                          bidirectional=0,
+                          batch_first=True)
+    layer_output = nn.Linear(in_features=args['rnn_hid_dim'],
+                             out_features=1,
+                             bias=fc_bias_flag)
+    if args["input_block"] in ["flatten", "none"]:
+        layer_input = nn.Flatten(start_dim=2)
+    elif args["input_block"] == "linear":
+        layer_input = nn.Sequential(
+            nn.Flatten(start_dim=2),
+            nn.Linear(args['data_dim'], args['emb_dim'], bias=fc_bias_flag),
+            nn.ReLU())
+    else:
+        raise ValueError(f'Incorrect block type: {args["input_block"]}. '
+                         f'Should be flatten, none, linear')
     return layer_input, layer_rnn, layer_output
 
 
@@ -348,3 +377,34 @@ def parse_bce_tl(args: Dict):
         layer_input = nn.Identity()
 
     return layer_input, layer_rnn, layer_output
+
+class LinearNorm(nn.Module):
+    def __init__(self, input_shape, output_shape, bias_rank=1, normalize="both") -> None:
+        super().__init__()
+
+        self.input_shape = input_shape
+        self.output_shape = output_shape
+
+        if isinstance(input_shape, tuple):
+            input_shape = input_shape[0]
+        if isinstance(output_shape, tuple):
+            output_shape = output_shape[0]
+
+        self.normalize = normalize
+        if self.normalize in ["both", "in"]:
+            self.norm_in  = nn.LayerNorm(input_shape)
+        if self.normalize in ["both", "out"]:
+            self.norm_out = nn.LayerNorm(output_shape)
+
+        self.linear = nn.Linear(input_shape, output_shape)
+
+    def forward(self, x) -> torch.Tensor:
+        if self.normalize in ["both", "in"]:
+            x = self.norm_in(x)
+
+        y = self.linear(x)
+
+        if self.normalize in ["both", "out"]:
+            y = self.norm_out(y)
+
+        return y            

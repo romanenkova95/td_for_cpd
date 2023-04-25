@@ -1,5 +1,6 @@
 from typing import Dict, Optional, Sequence, Tuple, Union
 import torch
+import torch.nn as nn
 from . import core_models, cpd_models as models
 from .core_models import fix_seeds
 
@@ -11,7 +12,6 @@ class TransposeLast2D(torch.nn.Module):
         return x.transpose(-1, -2)
 
 def str2tuple(str_value: Optional[str]) -> Optional[Union[Tuple[int], int]]:
-
     if str_value is not None:
         output_tuple = tuple(map(int,str_value.split(",")))
         if len(output_tuple) == 1:
@@ -144,7 +144,7 @@ def get_args(parser):
 
 def get_bce_args(args_local):
 
-    assert args_local.block_type in ["tcl3d", "trl3dhalf", "linear", "tcl", "trl-half", "tt"], \
+    assert args_local.block_type in ["tcl3d", "trl3dhalf", "linear", "linear_norm", "tcl", "trl-half", "tt"], \
         f'BCE model supports only tcl*, trl* and linear blocks'
 
     args = {}
@@ -278,3 +278,6 @@ def get_kl_cpd_model(args, extractor, train_dataset, test_dataset):
                               extractor=extractor)
 
     return model
+
+
+#####

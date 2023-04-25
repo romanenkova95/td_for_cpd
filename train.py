@@ -20,7 +20,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 import argparse
 
-possible_blocks = ["linear", "tcl3d", "trl3dhalf", "tcl", "trl-half", "tt"]
+possible_blocks = ["linear", "tcl3d", "trl3dhalf", "tcl", "trl-half", "tt", "linear_norm"]
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Test your model')
@@ -34,7 +34,7 @@ def get_parser():
                         choices=["gru", "lstm"])
     parser.add_argument("--input-block", type=str, default="none", 
                         help='type of input block',
-                        choices=["none"] + possible_blocks)
+                        choices=["none", "flatten"] + possible_blocks)
     parser.add_argument("--output-block", type=str, default="same",
                         help='type of output(flatten for bce) block for tl',
                         choices=["same"] + possible_blocks)
