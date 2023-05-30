@@ -148,18 +148,26 @@ class LstmTl(nn.Module):
 
         for x_t in inputs:
             # print(self.linear_u)
-            x_z, x_r, x_h, x_c = [linear(x_t) for linear in self.linear_w]
-            h_z, h_r, h_h, h_c = [linear(h_prev) for linear in self.linear_u]
+            x_f, x_i, x_o, x_c_hat = [linear(x_t) for linear in self.linear_w]
+            h_f, h_i, h_o, h_c_hat = [linear(h_prev) for linear in self.linear_u]
 
-            output_z = torch.sigmoid(x_z + h_z) # update gate
-            output_r = torch.sigmoid(x_r + h_r) # forget gate
-            output_o = torch.sigmoid(x_h + h_h) # output gate
-            output_c = torch.sigmoid(x_r + h_r) # cell input activation vector
+            f_t = torch.sigmoid(x_f + h_f)
+            i_t = torch.sigmoid(x_i + h_i)
+            o_t = torch.sigmoid(x_o + h_o)
+            c_t_hat = torch.tanh(x_c_hat + h_c_hat)
+            c_prev = torch.mul(f_t, c_prev) + torch.mul(i_t, c_t_hat)
+            h_prev = torch.mul(o_t, torch.tanh(c_prev))
+            outputs.append(h_prev)
 
-            c_prev = output_r * c_prev + output_z * output_c
-            h_prev = output_o * torch.sigmoid(c_prev)
+            #output_z = torch.sigmoid(x_z + h_z) # update gate
+            #output_r = torch.sigmoid(x_r + h_r) # forget gate
+            #output_o = torch.sigmoid(x_h + h_h) # output gate
+            #output_c = torch.tanh(x_c + h_c) # cell input activation vector
 
-            outputs.append(h_prev)#.clone().detach()) # NOTE fail with detach. check it
+            #c_prev = output_r * c_prev + output_z * output_c
+            #h_prev = output_o * torch.tanh(c_prev)
+
+            #outputs.append(h_prev)#.clone().detach()) # NOTE fail with detach. check it
 
         outputs = torch.stack(outputs, dim=0)
         # print(f'h1: {h_prev.shape}')

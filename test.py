@@ -80,7 +80,7 @@ seed = 0 # args["seed"]
 model_utils.fix_seeds(seed)
 
 model = model_utils.get_model(args, train_dataset, test_dataset)
-model.load_state_dict(state_dict)
+model.load_state_dict(state_dict, strict=True)
 
 threshold_number = args_local.threshold_number # 25
 threshold_list = np.linspace(-5, 5, threshold_number)

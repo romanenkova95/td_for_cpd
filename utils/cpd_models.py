@@ -323,6 +323,7 @@ class CPDModel(pl.LightningModule):
         :return: predictions
         """
         return self.model(self.extractor(inputs).transpose(1, 2))
+        # return self.model(inputs.transpose(1, 2))
 
     def training_step(self, batch: torch.Tensor, *args) -> torch.Tensor:
         """Train CPD model.

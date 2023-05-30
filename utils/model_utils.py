@@ -90,8 +90,12 @@ def get_args(parser):
             args["input_block"] in ["none", "linear"]:
 
             args['data_dim'] = 12288
+            # args['data_dim'] = 196608 #12288
         else:
             args['data_dim'] = (192, 8, 8)
+            args['data_dim'] = str2tuple(args_local.data_dim)
+            #args['data_dim'] = (3, 256, 256)
+
     else:
         assert args['data_dim'] == args["experiments_name"].split("_")[1][:-1], \
             f'Cannot match D for synthetic dataset: {args["data_dim"]} != {args["experiments_name"]}'
@@ -278,6 +282,3 @@ def get_kl_cpd_model(args, extractor, train_dataset, test_dataset):
                               extractor=extractor)
 
     return model
-
-
-#####
