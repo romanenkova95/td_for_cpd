@@ -86,7 +86,7 @@ def get_args(parser):
         args["output_block"] = args["block_type"]
 
     if not args["experiments_name"].startswith("synthetic"):
-        if  args["block_type"] == "linear" and \
+        if  args["block_type"].startswith("linear") and \
             args["input_block"] in ["none", "linear"]:
 
             args['data_dim'] = 12288
