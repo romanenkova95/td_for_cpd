@@ -215,39 +215,58 @@ def get_model(args,
               freeze_extractor=True,
               add_param_numel_to_args=True):
 
-    if extractor is None:
-        print(f'Use extractor {args["name"]}')
-        extractor = torch.hub.load('facebookresearch/pytorchvideo:main',
-                                   args["name"],
-                                   pretrained=True)
-        extractor = torch.nn.Sequential(*list(extractor.blocks[:5]))
+    extractor = get_extractor(extractor, args["name"], args["experiments_name"], freeze_extractor)
+    
 
-    if args["experiments_name"].startswith("synthetic"):
-        # NOTE reshape to fix video extractor
-        extractor = TransposeLast2D()
+    if args["model"] == "bce":
+        model = get_bce_model(args, extractor, train_dataset, test_dataset)
+    elif args["model"] == "kl-cpd":
+        model = get_kl_cpd_model(args, extractor, train_dataset, test_dataset)
+    else:
+        raise ValueError(f'Unknown model {args["model"]}')
 
     if add_param_numel_to_args:
         args["extractor_params"] = count_params(extractor)
 
-    if args["model"] == "bce":
-        model = get_bce_model(args, extractor, train_dataset, test_dataset)
-        if add_param_numel_to_args:
+        if args["model"] == "bce":
             args["model_params"] = count_params(model.model)
 
-    elif args["model"] == "kl-cpd":
-        model = get_kl_cpd_model(args, extractor, train_dataset, test_dataset)
-        if add_param_numel_to_args:
+        elif args["model"] == "kl-cpd":
             args["model_gen_params"] = count_params(model.net_generator)
             args["model_disc_params"] = count_params(model.net_discriminator)
-    else:
-        raise ValueError(f'Unknown model {args["model"]}')
-
-    if freeze_extractor:
-        for param in model.extractor.parameters():
-            param.requires_grad = False
 
     return model
 
+extractor_blocks = {
+    "extractor_blocks": 5
+}
+
+def get_extractor(extractor, model_name, experiment, freeze_extractor=True):
+    
+    if extractor is None:
+        print(f'Use extractor {model_name}')
+        
+        if ":" in model_name:
+            model_name, i_cut = model_name.split(":")
+            i_cut = int(i_cut)
+        else:
+            i_cut = extractor_blocks[model_name]
+
+        extractor = torch.hub.load('facebookresearch/pytorchvideo:main',
+                                   model_name,
+                                   pretrained=True)
+        
+        extractor = torch.nn.Sequential(*list(extractor.blocks[:i_cut]))
+
+    if experiment.startswith("synthetic"):
+        # NOTE reshape to fix video extractor
+        extractor = TransposeLast2D()
+
+    if freeze_extractor:
+        for param in extractor.parameters():
+            param.requires_grad = False
+
+    return extractor
 
 def get_bce_model(args, extractor, train_dataset, test_dataset):
     core_model = core_models.BceRNNTl_v2(args)

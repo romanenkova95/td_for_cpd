@@ -96,10 +96,9 @@ def main(args):
     inputs = T.randn(img_size).to(device)
 
     flops_orig_total, fbmo = estimate_model_flops(model_orig, inputs, custom_ops)
-    print(f'total: {flops_orig_total}')
-
-    fbmo = flops_orig.by_module_and_operator()
-    print(f'model: {fbmo["model"]} ({sum(fbmo["model"].values())}, {sum(fbmo["model"].values()) / flops_orig_total * 100:.3f}%)\n'
+    
+    print(f'total: {flops_orig_total}\n'
+          f'model: {fbmo["model"]} ({sum(fbmo["model"].values())}, {sum(fbmo["model"].values()) / flops_orig_total * 100:.3f}%)\n'
           f'\tin: {fbmo["model.input_layer"]}\n'
           f'\trnn: {fbmo["model.rnn"]}\n'
           f'\tout: {fbmo["model.output_layer"]}\n'

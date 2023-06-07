@@ -6,7 +6,6 @@ from torch import Tensor
 from torch.nn import Parameter
 from torch.autograd import Variable
 
-use_cuda = torch.cuda.is_available()
 
 class LSTM(nn.Module):
     def __init__(self,
@@ -40,17 +39,16 @@ class LSTM(nn.Module):
         for l in self.layers:
             l.reset_parameters()
 
-    def init_hidden(self, batch_size):
+    def init_hidden(self, x):
         # Uses Xavier init here.
+        batch_size = x.shape[0]
         hiddens = []
         for l in self.layers:
             std = math.sqrt(2.0 / (l.input_size + l.hidden_size))
             h = Variable(Tensor(1, batch_size, l.hidden_size).normal_(0, std))
             c = Variable(Tensor(1, batch_size, l.hidden_size).normal_(0, std))
-            if use_cuda:
-                hiddens.append((h.cuda(), c.cuda()))
-            else:
-                hiddens.append((h, c))
+            hiddens.append((h.to(x), c.to(x)))
+
         return hiddens
 
     def layer_forward(self, l, xs, h, image_emb, reverse=False):
@@ -74,7 +72,7 @@ class LSTM(nn.Module):
 
     def forward(self, x, hiddens=None, image_emb=None):
         if hiddens is None:
-            hiddens = self.init_hidden(x.shape[0])
+            hiddens = self.init_hidden(x)
 
         if self.direction > 1:
             x = torch.cat((x, x), 2)
