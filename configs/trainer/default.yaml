@@ -1,0 +1,11 @@
+_target_: pytorch_lightning.Trainer
+
+gpus:
+- 1
+
+min_epochs: 1
+max_epochs: 200
+benchmark: True
+check_val_every_n_epoch: 1
+resume_from_checkpoint: null
+gradient_clip_val: 0.0

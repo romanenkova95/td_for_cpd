@@ -1,0 +1,9 @@
+train:
+  __target__: SyntheticNormalDataset
+    seq_len: 128
+    num: 1000
+    D: 1
+    random_seed: 123
+
+test:
+  null

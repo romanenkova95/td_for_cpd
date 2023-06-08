@@ -1,0 +1,45 @@
+train:
+  __target__: UCFVideoDataset
+    clip_length_in_frames: 16
+    step_between_clips: 5
+    path_to_data: "data/explosion/"
+    path_to_annotation: ${path_to_data}UCF_train_time_markup.txt
+    video_transform: 
+      _target_: torchvision.transforms.Compose
+      _args_:
+        - _target_: torchvision.transforms.Lambda
+          _args_: "${norm_img}"
+        - _target_: torchvision.transforms._transforms_video.NormalizeVideo
+          mean: [0.45, 0.45, 0.45]
+          std: [0.225, 0.225, 0.225]
+        - _target_: torchvision.transforms._transforms_video.ShortSideScale
+          size: 256
+        - _target_: torchvision.transforms._transforms_video.CenterCropVideo
+          crop_size: (256, 256)
+    
+    num_workers: 0
+    fps: 30
+    sampler: all
+
+test:
+  __target__: UCFVideoDataset
+    clip_length_in_frames: 16
+    step_between_clips: 16
+    path_to_data: "data/explosion/"
+    path_to_test_annotation: ${path_to_data}UCF_test_time_markup.txt
+    video_transform: 
+      _target_: torchvision.transforms.Compose
+      _args_:
+        - _target_: torchvision.transforms.Lambda
+          _args_: "${norm_img}"
+        - _target_: torchvision.transforms._transforms_video.NormalizeVideo
+          mean: [0.45, 0.45, 0.45]
+          std: [0.225, 0.225, 0.225]
+        - _target_: torchvision.transforms._transforms_video.ShortSideScale
+          size: 256
+        - _target_: torchvision.transforms._transforms_video.CenterCropVideo
+          crop_size: (256, 256)
+    
+    num_workers: 0
+    fps: 30
+    sampler: all
