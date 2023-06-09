@@ -6,9 +6,9 @@
 defaults:
   - _self_
   - datamodule: base_datamodule.yaml
-  - datasets: explosion.yaml
-  - models: bce.yaml
-  - core_models: tda_lstm.yaml
+  - dataset: explosion.yaml
+  - core_model: tda_lstm.yaml
+  - model: bce.yaml  
   - trainer: default.yaml
   - callbacks: val_loss_monitor.yaml
   - logger: comet.yaml
@@ -17,6 +17,7 @@ defaults:
   # e.g. best hyperparameters for given model and datamodule
   - experiment: null
 
+model_name: "bce"
 # path to original working directory
 # hydra hijacks working directory by changing it to the new log directory
 # https://hydra.cc/docs/next/tutorials/basic/running_your_app/working_directory
@@ -40,4 +41,4 @@ seed: 123
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
-name: ${datamodule.dataset_name}_${models.model_name}_${core_models.rnn_block_type}_seed_${seed}
+name: ${dataset.dataset_name}_${model_name}_${core_model.rnn_block_type}_seed_${seed}

@@ -9,6 +9,8 @@ import numpy as np
 
 
 def initialize_bias(output_shape, bias_rank):
+    if ~isinstance(output_shape, tuple) & (len(output_shape) > 1):
+        output_shape = tuple(output_shape)
     if bias_rank == -1:
         bias_list = []
         bias = nn.Parameter(torch.randn(output_shape))

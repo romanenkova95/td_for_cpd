@@ -1,0 +1,6 @@
+_target_: src.datamodules.datamodule.DataModule
+train_dataset: ${dataset.train}
+test_dataset: ${dataset.test}
+batch_size: 15
+num_workers: 2 
+seed: 123

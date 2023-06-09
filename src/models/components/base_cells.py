@@ -1,9 +1,9 @@
-from typing import Tuple, Union, Optional
+from typing import Tuple, Union, Optional, List
 import torch
 import torch.nn as nn
 import numpy as np
 
-from tensor_layers import TCL, TCL3D, TRLhalf, TRL3Dhalf, TT
+from .tensor_layers import TCL, TCL3D, TRLhalf, TRL3Dhalf, TT
 import warnings
 
 
@@ -11,15 +11,14 @@ class CoreBlock(nn.Module):
     def __init__(
         self,
         block_type: str,
-        input_dims: Union[Tuple[int, int, int], int],
-        hidden_dims: Union[Tuple[int, int, int], Tuple[int], int],
-        ranks: Optional[Union[Tuple[int, int, int], int]] = None,
+        input_dims: Union[List[int], int],
+        hidden_dims: Union[List[int], int],
+        ranks: Optional[Union[List[int], int]] = None,
         bias_rank: Optional[int] = -1,
         normalize: str = "both",
         block_place: str = "inter",  # "input", "output", "inter" aka "intermediate"
     ) -> None:
         super().__init__()
-
         self.block_type = block_type.lower()
         self.block_place = block_place
 
@@ -33,7 +32,6 @@ class CoreBlock(nn.Module):
 
         block, args = self._init_block(_tensor_args, ranks)
         self.args = args
-
         if self.block_place == "inter":
             if self.block_type != "flatten":
                 self.block = block(self.input_dims, self.hidden_dims, **self.args)
@@ -75,27 +73,25 @@ class CoreBlock(nn.Module):
     def _sanity_check(self, ranks) -> None:
         # sanity check
         if self.block_type in ["tcl3d", "tcl", "trl-half", "trl3dhalf", "tt"]:
-            assert isinstance(
-                self.input_dims, tuple
-            ), f"Something is wrong with input dims."
-            assert isinstance(
-                self.hidden_dims, tuple
-            ), f"Something is wrong with hidden dims."
+            assert len(self.input_dims) == 3, f"Something is wrong with input dims."
+            assert len(self.hidden_dims) == 3, f"Something is wrong with hidden dims."
 
         if self.block_type in ["trl-half", "trl3dhalf", "tt"]:
             assert ranks is not None, f"Ranks not provided"
 
         if self.block_type == "linear":
-            if isinstance(self.input_dims, tuple):
-                self.input_dims = np.prod(self.input_dims)
-                warnings.warn(
-                    "Input dims can't be tuple for linear layer, product values."
-                )
-            if isinstance(self.hidden_dims, tuple):
-                self.hidden_dims = np.prod(self.hidden_dims)
-                warnings.warn(
-                    "Hidden dims can't be tuple for linear layer, product values."
-                )
+            if not isinstance(self.input_dims, int):
+                if len(self.input_dims) > 1:
+                    self.input_dims = np.prod(self.input_dims)
+                    warnings.warn(
+                        "Input dims can't be tuple for linear layer, product values."
+                    )
+            if not isinstance(self.hidden_dims, int): 
+                if len(self.hidden_dims) > 1:
+                    self.hidden_dims = np.prod(self.hidden_dims)
+                    warnings.warn(
+                        "Hidden dims can't be tuple for linear layer, product values."
+                    )
             if self.bias_rank != 0:
                 self.bias_rank = 1
 
@@ -126,13 +122,13 @@ class CoreBlock(nn.Module):
         if self.block_place == "input":
             if self.block_type not in ["flatten", "none", "linear"]:
                 _block = nn.Sequential(
-                    block(self.input_dims, self.hidden_dims, **self.args), nn.ReLu()
+                    block(self.input_dims, self.hidden_dims, **self.args), nn.ReLU()
                 )
             elif self.block_type == "linear":
                 _block = nn.Sequential(
                     nn.Flatten(start_dim=2),
                     block(self.input_dims, self.hidden_dims, **self.args),
-                    nn.ReLu(),
+                    nn.ReLU(),
                 )
             elif self.block_type == "flatten":
                 _block = nn.Flatten(**self.args)
@@ -192,9 +188,9 @@ class LstmTl(nn.Module):
     def __init__(self, input_layer, hidden_layer, batch_first=True) -> None:
         super().__init__()
 
-        self.linear_w = nn.ModuleList([input_layer for _ in range(3)])
-        self.linear_u = nn.ModuleList([hidden_layer for _ in range(3)])
-
+        self.linear_w = nn.ModuleList([input_layer for _ in range(4)])
+        self.linear_u = nn.ModuleList([hidden_layer for _ in range(4)])
+        self.hidden_dims = input_layer.hidden_dims
         self.batch_first = batch_first
 
     def forward(self, inputs, init_states=None):

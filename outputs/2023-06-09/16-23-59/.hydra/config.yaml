@@ -1,0 +1,170 @@
+model_name: bce
+original_work_dir: ${hydra:runtime.cwd}
+save_dir: ${hydra:runtime.output_dir}/saves/model
+ignore_warnings: true
+train: true
+test: true
+seed: 123
+name: ${dataset.dataset_name}_${model_name}_${core_model.rnn_block_type}_seed_${seed}
+datamodule:
+  _target_: src.datamodules.datamodule.DataModule
+  train_dataset: ${dataset.train}
+  test_dataset: ${dataset.test}
+  batch_size: 15
+  num_workers: 2
+  seed: 123
+dataset:
+  dataset_name: explosion
+  train:
+    _target_: src.datamodules.components.datasets.UCFVideoDataset
+    clip_length_in_frames: 16
+    step_between_clips: 5
+    path_to_data: ${original_work_dir}/data/explosion/
+    path_to_annotation: ${dataset.train.path_to_data}UCF_train_time_markup.txt
+    path_to_clips: ${original_work_dir}/saves/
+    video_transform:
+      _target_: torchvision.transforms.Compose
+      transforms:
+      - _target_: pytorchvideo.transforms.Div255
+      - _target_: pytorchvideo.transforms.Normalize
+        mean:
+        - 0.45
+        - 0.45
+        - 0.45
+        std:
+        - 0.225
+        - 0.225
+        - 0.225
+      - _target_: pytorchvideo.transforms.ShortSideScale
+        size: 256
+      - _target_: torchvision.transforms._transforms_video.CenterCropVideo
+        crop_size:
+        - 256
+        - 256
+    num_workers: 0
+    fps: 30
+    sampler: all
+  test:
+    _target_: src.datamodules.components.datasets.UCFVideoDataset
+    clip_length_in_frames: 16
+    step_between_clips: 16
+    path_to_data: ${original_work_dir}/data/explosion/
+    path_to_annotation: ${dataset.test.path_to_data}UCF_test_time_markup.txt
+    path_to_clips: ${original_work_dir}/saves/
+    video_transform:
+      _target_: torchvision.transforms.Compose
+      transforms:
+      - _target_: pytorchvideo.transforms.Div255
+      - _target_: pytorchvideo.transforms.Normalize
+        mean:
+        - 0.45
+        - 0.45
+        - 0.45
+        std:
+        - 0.225
+        - 0.225
+        - 0.225
+      - _target_: pytorchvideo.transforms.ShortSideScale
+        size: 256
+      - _target_: torchvision.transforms._transforms_video.CenterCropVideo
+        crop_size:
+        - 256
+        - 256
+    num_workers: 0
+    fps: 30
+    sampler: all
+core_model:
+  rnn_block_type: tcl3d
+  data_dim:
+  - 192
+  - 8
+  - 8
+  emb_dims: ${core_model.data_dim}
+  hidden_dims:
+  - 16
+  - 4
+  - 4
+  ranks_input: ${core_model.data_dim}
+  ranks_output:
+  - 32
+  - 8
+  - 8
+  ranks_rnn:
+  - 32
+  - 8
+  - 8
+  fc_bias: -1
+  rnn_bias: -1
+  model_name: tda_lstm
+  model_description:
+    input_block:
+      _target_: src.models.components.base_cells.CoreBlock
+      block_type: identity
+      input_dims: ${core_model.data_dim}
+      hidden_dims: ${core_model.emb_dims}
+      ranks: ${core_model.ranks_input}
+      bias_rank: ${core_model.fc_bias}
+      normalize: both
+      block_place: input
+    rnn_block:
+      _target_: src.models.components.base_cells.LstmTl
+      input_layer: torch.nn.Identity
+      hidden_layer: torch.nn.Identity
+      batch_first: true
+    output_block:
+      _target_: src.models.components.base_cells.CoreBlock
+      block_type: linear
+      input_dims: ${core_model.hidden_dims}
+      hidden_dims: 1
+      ranks: ${core_model.ranks_output}
+      bias_rank: ${core_model.fc_bias}
+      normalize: in
+      block_place: output
+model:
+  _target_: src.models.cpd_models.CPDModel
+  model: ${core_model.model_description}
+  extractor:
+    _target_: src.models.components.core_models.X3D_M
+    pretrained: true
+    block_numbers: 5
+    freezed: true
+  learning_rate: 0.001
+  thresholds:
+  - 1
+  - 2
+  - 3
+trainer:
+  _target_: pytorch_lightning.Trainer
+  gpus:
+  - 0
+  min_epochs: 1
+  max_epochs: 200
+  benchmark: true
+  check_val_every_n_epoch: 1
+  resume_from_checkpoint: null
+  gradient_clip_val: 0.0
+callbacks:
+  model_checkpoint:
+    _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    monitor: val_loss
+    mode: min
+    save_top_k: 1
+    save_last: true
+    verbose: false
+    dirpath: ${hydra:runtime.output_dir}/checkpoints
+    filename: '{epoch:02d}-{val_loss:.3f}'
+    auto_insert_metric_name: false
+  early_stopping:
+    _target_: pytorch_lightning.callbacks.EarlyStopping
+    monitor: val_loss
+    mode: min
+    patience: 10
+    min_delta: 0.0
+    stopping_threshold: null
+logger:
+  comet:
+    _target_: pytorch_lightning.loggers.comet.CometLogger
+    api_key: vdkouCumT25Fjnqyk3MyW5S4F
+    project_name: tda_cpd_${logger.comet.experiment_name}
+    workspace: romanenkova95
+    experiment_name: ${name}

@@ -1,8 +1,0 @@
-# https://www.comet.ml
-
-comet:
- _target_: pytorch_lightning.loggers.comet.CometLogger
- api_key: vdkouCumT25Fjnqyk3MyW5S4F
- project_name: tda_cpd_${experiment_name}
- workspace: romanenkova95
- experiment_name: ${name}

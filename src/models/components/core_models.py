@@ -1,13 +1,9 @@
 """Core models for CPD."""
 
 from typing import Dict, Tuple
-
-import random
 import torch
 import torch.nn as nn
-import numpy as np
-
-from models.components.base_cells import init_fc_rnn_tl, init_bias, GruTl, parse_bce_args
+from .base_cells import GruTl
 
 ########################KL-CPD######################################
 class KlcpdGen(nn.Module):
@@ -270,17 +266,17 @@ class KlcpdDiscTl(nn.Module):
 
 
 class BceRNNTl(nn.Module):
-    def __init__(self, input_layer, rnn, output_layer) -> None:
+    def __init__(self, input_block, rnn_block, output_block) -> None:
         super().__init__()
-        self.input_layer = input_layer
-        self.rnn = rnn
-        self.output_layer = output_layer
+        self.input_block = input_block
+        self.rnn_block = rnn_block
+        self.output_block = output_block
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
 
-        output = self.input_layer(input)
-        output, _ = self.rnn(output)
-        output = self.output_layer(output)
+        output = self.input_block(input)
+        output, _ = self.rnn_block(output)
+        output = self.output_block(output)
         output = output.reshape(*output.shape[:2], 1)  # flatten across last 3 dim
         output = torch.sigmoid(output)
         return output

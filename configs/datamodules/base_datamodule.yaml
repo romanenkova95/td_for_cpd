@@ -1,5 +1,0 @@
-train_dataset: ${datasets.train}
-test_dataset: ${datasets.test}
-batch_size: 16
-num_workers: 2 
-seed: 123

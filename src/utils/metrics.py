@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import utils.kl_cpd as klcpd
+#import utils.kl_cpd as klcpd
 from time import time
 
 
@@ -36,6 +36,7 @@ def calculate_errors(
         - array of times to false alarms
         - array of detection delays
     """
+
     FP_delay = torch.zeros_like(real, requires_grad=False)
     delay = torch.zeros_like(real, requires_grad=False)
 

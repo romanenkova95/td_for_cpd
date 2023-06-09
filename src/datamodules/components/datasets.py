@@ -11,7 +11,6 @@ import torch
 import torch.nn as nn
 from torch.distributions.multivariate_normal import MultivariateNormal
 from torchvision.datasets.video_utils import VideoClips
-from ...models.components.core_models import fix_seeds
 from torch.utils.data import Dataset
 
 
@@ -24,6 +23,7 @@ class UCFVideoDataset(Dataset):
         step_between_clips: int,
         path_to_data: str,
         path_to_annotation: str,
+        path_to_clips: str, 
         video_transform: Optional[nn.Module] = None,
         num_workers: int = 0,
         fps: int = 30,
@@ -53,19 +53,20 @@ class UCFVideoDataset(Dataset):
         self.path_to_data = path_to_data
         self.video_list = UCFVideoDataset._get_video_list(dataset_path=self.path_to_data)
 
+
         # annotation loading
         dict_metadata, _ = UCFVideoDataset._parse_annotation(path_to_annotation)
 
-        path_to_clips = "{}_clips_len_{}_step_{}_fps_{}.pth".format(
+        path_to_clips_ = "{}_clips_len_{}_step_{}_fps_{}.pth".format(
             self.path_to_data.split("/")[1],
             self.clip_length_in_frames,
             self.step_between_clips,
             self.fps,
         )
         if "train" in path_to_annotation:
-            path_to_clips = "saves/train_" + path_to_clips
+            path_to_clips = path_to_clips + 'train_' + path_to_clips_
         else:
-            path_to_clips = "saves/test_" + path_to_clips
+            path_to_clips = path_to_clips + 'test_' + path_to_clips_
 
         if os.path.exists(path_to_clips):
             with open(path_to_clips, "rb") as clips:

@@ -1,0 +1,130 @@
+model_name: bce
+original_work_dir: ${hydra:runtime.cwd}
+save_dir: ${hydra:runtime.output_dir}/saves/model
+ignore_warnings: true
+train: true
+test: true
+seed: 123
+name: ${dataset.dataset_name}_${model_name}_${core_model.rnn_block_type}_seed_${seed}
+datamodule:
+  _target_: src.datamodules.datamodule.DataModule
+  train_dataset: ${dataset.train}
+  test_dataset: ${dataset.test}
+  batch_size: 16
+  num_workers: 2
+  seed: 123
+dataset:
+  dataset_name: explosion
+  train:
+    _target_: src.datamodules.components.datasets.UCFVideoDataset
+    clip_length_in_frames: 16
+    step_between_clips: 5
+    path_to_data: ${original_work_dir}/data/explosion/
+    path_to_annotation: ${dataset.train.path_to_data}UCF_train_time_markup.txt
+    video_transform:
+      _target_: torchvision.transforms.Compose
+      _args_:
+      - _target_: torchvision.transforms._transforms_video.NormalizeVideo
+        mean:
+        - 0.45
+        - 0.45
+        - 0.45
+        std:
+        - 0.225
+        - 0.225
+        - 0.225
+    num_workers: 0
+    fps: 30
+    sampler: all
+  test:
+    _target_: src.datamodules.components.datasets.UCFVideoDataset
+    clip_length_in_frames: 16
+    step_between_clips: 16
+    path_to_data: ${original_work_dir}/data/explosion/
+    path_to_test_annotation: ${dataset.test.path_to_data}UCF_test_time_markup.txt
+    video_transform: null
+    num_workers: 0
+    fps: 30
+    sampler: all
+core_model:
+  rnn_block_type: linear
+  data_dim: 12288
+  emb_dims: ${core_model.data_dim}
+  hidden_dims: 64
+  ranks_input: 1
+  ranks_output: 1
+  ranks_rnn: 1
+  model_name: linear_lstm
+  model_description:
+    _target_: src.models.components.core_models.BceRNNTl
+    input_block:
+      _target_: src.models.components.base_cells.CoreBlock
+      block_type: identity
+      input_dims: ${core_model.data_dim}
+      hidden_dims: ${core_model.emb_dims}
+      ranks: null
+      bias_rank: ${core_model.ranks_input}
+      normalize: both
+      block_place: input
+    rnn_block:
+      _target_: torch.nn.LSTM
+      input_size: ${core_model.emb_dims}
+      hidden_size: ${core_model.hidden_dims}
+      num_layers: 1
+      bidirectional: false
+      bias: ${core_model.ranks_rnn}
+      batch_first: true
+    output_block:
+      _target_: src.models.components.base_cells.CoreBlock
+      block_type: linear
+      input_dims: ${core_model.hidden_dims}
+      hidden_dims: 1
+      ranks: null
+      bias_rank: ${core_model.ranks_output}
+      normalize: in
+      block_place: output
+model:
+  _target_: src.models.cpd_models.CPDModel
+  model: ${core_model.model_description}
+  extractor:
+    _target_: src.models.components.core_models.X3D_M
+    pretrained: true
+    block_numbers: 5
+    freezed: true
+  learning_rate: 0.001
+  thresholds: null
+trainer:
+  _target_: pytorch_lightning.Trainer
+  gpus:
+  - 0
+  min_epochs: 1
+  max_epochs: 200
+  benchmark: true
+  check_val_every_n_epoch: 1
+  resume_from_checkpoint: null
+  gradient_clip_val: 0.0
+callbacks:
+  model_checkpoint:
+    _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    monitor: val_loss
+    mode: min
+    save_top_k: 1
+    save_last: true
+    verbose: false
+    dirpath: ${hydra:runtime.output_dir}/checkpoints
+    filename: '{epoch:02d}-{val_loss:.3f}'
+    auto_insert_metric_name: false
+  early_stopping:
+    _target_: pytorch_lightning.callbacks.EarlyStopping
+    monitor: val_loss
+    mode: min
+    patience: 10
+    min_delta: 0.0
+    stopping_threshold: null
+logger:
+  comet:
+    _target_: pytorch_lightning.loggers.comet.CometLogger
+    api_key: vdkouCumT25Fjnqyk3MyW5S4F
+    project_name: tda_cpd_${logger.comet.experiment_name}
+    workspace: romanenkova95
+    experiment_name: ${name}

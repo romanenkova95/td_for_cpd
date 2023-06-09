@@ -1,0 +1,14 @@
+_target_: src.models.cpd_models.CPDModel
+model: ${core_model.model_description}
+extractor: 
+  _target_: src.models.components.core_models.X3D_M
+  pretrained: True
+  block_numbers: 5
+  freezed: True
+learning_rate: 1e-3
+thresholds: [1,2,3] #np.linspace(0,1,10) ####
+
+#threshold_number = args_local.threshold_number # 25
+#threshold_list = np.linspace(-5, 5, threshold_number)
+#threshold_list = 1 / (1 + np.exp(-threshold_list))
+#threshold_list = [-0.001] + list(threshold_list) + [1.001]

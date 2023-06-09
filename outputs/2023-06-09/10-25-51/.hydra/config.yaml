@@ -1,0 +1,13 @@
+original_work_dir: ${hydra:runtime.cwd}
+save_dir: ${hydra:runtime.output_dir}/saves/model
+ignore_warnings: true
+train: true
+test: true
+seed: 123
+name: ${datamodule.dataset_name}_${models.model_name}_${core_models.rnn_block_type}_seed_${seed}
+datamodule:
+  train_dataset: ${dataset.train}
+  test_dataset: ${dataset.test}
+  batch_size: 16
+  num_workers: 2
+  seed: 123

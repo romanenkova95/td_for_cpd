@@ -1,0 +1,48 @@
+dataset_name: "explosion"
+path_to_data: ${original_work_dir}/data/explosion/
+path_to_clips: ${original_work_dir}/saves/
+train:
+  _target_: src.datamodules.components.datasets.UCFVideoDataset
+  clip_length_in_frames: 16
+  step_between_clips: 5
+  path_to_data: ${dataset.path_to_data}
+  path_to_annotation: ${dataset.train.path_to_data}UCF_train_time_markup.txt
+  path_to_clips: ${dataset.path_to_clips}
+  video_transform: 
+    _target_: torchvision.transforms.Compose
+    transforms:
+      - _target_: pytorchvideo.transforms.Div255
+      - _target_: pytorchvideo.transforms.Normalize
+        mean: [0.45, 0.45, 0.45]
+        std: [0.225, 0.225, 0.225]
+      - _target_: pytorchvideo.transforms.ShortSideScale
+        size: 256
+      - _target_: torchvision.transforms._transforms_video.CenterCropVideo
+        crop_size: [256, 256]
+
+  num_workers: 0
+  fps: 30
+  sampler: equal
+
+test:
+  _target_: src.datamodules.components.datasets.UCFVideoDataset
+  clip_length_in_frames: 16
+  step_between_clips: 16
+  path_to_data: ${dataset.path_to_data}
+  path_to_annotation: ${dataset.test.path_to_data}UCF_test_time_markup.txt
+  path_to_clips: ${dataset.path_to_clips}
+  video_transform: 
+    _target_: torchvision.transforms.Compose
+    transforms:
+      - _target_: pytorchvideo.transforms.Div255
+      - _target_: pytorchvideo.transforms.Normalize
+        mean: [0.45, 0.45, 0.45]
+        std: [0.225, 0.225, 0.225]
+      - _target_: pytorchvideo.transforms.ShortSideScale
+        size: 256
+      - _target_: torchvision.transforms._transforms_video.CenterCropVideo
+        crop_size: [256, 256]
+  
+  num_workers: 0
+  fps: 30
+  sampler: downsample_norm

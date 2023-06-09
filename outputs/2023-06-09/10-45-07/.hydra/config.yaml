@@ -1,0 +1,52 @@
+original_work_dir: ${hydra:runtime.cwd}
+save_dir: ${hydra:runtime.output_dir}/saves/model
+ignore_warnings: true
+train: true
+test: true
+seed: 123
+name: ${datamodule.dataset_name}_${models.model_name}_${core_models.rnn_block_type}_seed_${seed}
+datamodule:
+  _target_: src.datamodules.datamodule.DataModule
+  train_dataset: ${dataset.train}
+  test_dataset: ${dataset.test}
+  batch_size: 16
+  num_workers: 2
+  seed: 123
+dataset:
+  train:
+    _target_: src.datamodules.components.datasets.UCFVideoDataset
+    clip_length_in_frames: 16
+    step_between_clips: 5
+    path_to_data: data/explosion/
+    path_to_annotation: ${dataset.train.path_to_data}UCF_train_time_markup.txt
+    video_transform:
+      _target_: torchvision.transforms.Compose
+      _args_:
+      - _target_: torchvision.transforms.Lambda
+        _args_: ${norm_img}
+      - _target_: torchvision.transforms._transforms_video.NormalizeVideo
+        mean:
+        - 0.45
+        - 0.45
+        - 0.45
+        std:
+        - 0.225
+        - 0.225
+        - 0.225
+      - _target_: torchvision.transforms._transforms_video.ShortSideScale
+        size: 256
+      - _target_: torchvision.transforms._transforms_video.CenterCropVideo
+        crop_size: (256, 256)
+    num_workers: 0
+    fps: 30
+    sampler: all
+trainer:
+  _target_: pytorch_lightning.Trainer
+  gpus:
+  - 1
+  min_epochs: 1
+  max_epochs: 200
+  benchmark: true
+  check_val_every_n_epoch: 1
+  resume_from_checkpoint: null
+  gradient_clip_val: 0.0
