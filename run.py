@@ -51,7 +51,8 @@ def main(config: Dict):
 
     test_cmd = ["python3", "test.py", timestamp, "--model", config["model"],
                 "--experiments-name", config["train"]["experiments_name"],
-                "--threshold-number", str(config["test"]["threshold_number"])]
+                "--threshold-number", str(config["test"]["threshold_number"]),
+                "--ext-name", config["train"]["ext_name"]]
 
     if config["model"] == "kl-cpd":
         test_cmd += ["--scales"] + list(map(lambda x: str(int(float(x))), config["test"]["scales"]))

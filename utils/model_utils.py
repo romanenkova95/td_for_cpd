@@ -89,10 +89,10 @@ def get_args(parser):
         if  args["block_type"].startswith("linear") and \
             args["input_block"] in ["none", "linear"]:
 
-            args['data_dim'] = 12288
-            # args['data_dim'] = 196608 #12288
+            # args['data_dim'] = 12288
+            args['data_dim'] = int(args_local.data_dim) #196608 #12288
         else:
-            args['data_dim'] = (192, 8, 8)
+            # args['data_dim'] = (192, 8, 8)
             args['data_dim'] = str2tuple(args_local.data_dim)
             #args['data_dim'] = (3, 256, 256)
 
@@ -215,7 +215,10 @@ def get_model(args,
               freeze_extractor=True,
               add_param_numel_to_args=True):
 
-    extractor = get_extractor(extractor, args["name"], args["experiments_name"], freeze_extractor)
+    if args["name"] == "x3d_m:wose":
+        extractor = get_x3d_m_extractor_2_without_se(freeze_extractor)
+    else:
+        extractor = get_extractor(extractor, args["name"], args["experiments_name"], freeze_extractor)
     
 
     if args["model"] == "bce":
@@ -238,8 +241,47 @@ def get_model(args,
     return model
 
 extractor_blocks = {
-    "extractor_blocks": 5
+    "x3d_m": 5 # 4: (96, 16, 16) = 24576, 3: 49152, 2: 98304, 1: 393216
 }
+
+def replace_layer_by_name(model: torch.nn.Module, 
+                          mname: str, 
+                          layer: torch.nn.Module):
+    """Insert layer into model according to path
+
+    Args:
+        model: original model
+        mname: path to insert
+        layer: layer to insert
+    """
+    module = model
+    mname_list = mname.split('.')
+    for mname in mname_list[:-1]:
+        module = module._modules[mname]
+
+    module._modules[mname_list[-1]] = layer
+
+def get_x3d_m_extractor_2_without_se(freeze_extractor=True):
+    
+
+    extractor = torch.hub.load('facebookresearch/pytorchvideo:main', 
+                               "x3d_m", pretrained=True)
+    extractor = torch.nn.Sequential(*list(extractor.blocks[:2]))
+    replace_layer_by_name(extractor, 
+                          "1.res_blocks.0.branch2.norm_b.1", 
+                          torch.nn.Identity())
+    replace_layer_by_name(extractor, 
+                          "1.res_blocks.2.branch2.norm_b.1", 
+                          torch.nn.Identity())
+
+    #  extractor.blocks[1].res_blocks[2].branch2.norm_b[1]
+    #  extractor[1].res_blocks[0].branch2.norm_b[1]
+
+    if freeze_extractor:
+        for param in extractor.parameters():
+            param.requires_grad = False
+
+    return extractor
 
 def get_extractor(extractor, model_name, experiment, freeze_extractor=True):
     

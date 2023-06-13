@@ -39,15 +39,14 @@ class LSTM(nn.Module):
         for l in self.layers:
             l.reset_parameters()
 
-    def init_hidden(self, x):
+    def init_hidden(self, batch_size, device):
         # Uses Xavier init here.
-        batch_size = x.shape[0]
         hiddens = []
         for l in self.layers:
             std = math.sqrt(2.0 / (l.input_size + l.hidden_size))
             h = Variable(Tensor(1, batch_size, l.hidden_size).normal_(0, std))
             c = Variable(Tensor(1, batch_size, l.hidden_size).normal_(0, std))
-            hiddens.append((h.to(x), c.to(x)))
+            hiddens.append((h.to(device), c.to(device)))
 
         return hiddens
 
@@ -72,7 +71,7 @@ class LSTM(nn.Module):
 
     def forward(self, x, hiddens=None, image_emb=None):
         if hiddens is None:
-            hiddens = self.init_hidden(x)
+            hiddens = self.init_hidden(x.shape[0], x.device)
 
         if self.direction > 1:
             x = torch.cat((x, x), 2)

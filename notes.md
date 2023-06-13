@@ -19,7 +19,7 @@ python3 script_test.py 221128T144649 --model bce  --experiments-name road_accide
 Results can be found in `saves/results/road_accidents/metrics`.
 
 For testing, in `utils/kl_cpd.py`, line 330 `pred_out = torch.tanh(pred_out * 10 ** 7)`, scale for `explosion` wa in `[1e4, 1e5, 1e6, 1e7]`.
-For training, `--bias-rank` can be `[4, 8, full]`. Also we can try `--emb-dim "64,8,8"` and `--hid-dim "32,4,4"` (see Table 2 in report).
+For training, `--bias-rank` can be `[4, 8, -1]`. Also we can try `--emb-dim "64,8,8"` and `--hid-dim "32,4,4"` (see Table 2 in report).
 
 
 

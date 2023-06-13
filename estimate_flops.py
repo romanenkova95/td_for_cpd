@@ -95,15 +95,22 @@ def main(args):
     model_orig = load_model(save_path, not args.not_strict).to(device)
     inputs = T.randn(img_size).to(device)
 
-    flops_orig_total, fbmo = estimate_model_flops(model_orig, inputs, custom_ops)
-    
-    print(f'total: {flops_orig_total}\n'
+    flops_orig_total, fbmo = estimate_model_flops(model_orig, inputs, custom_ops)    
+    print(prefix,
+          f'total FLOPs {flops_orig_total}\n'
           f'model: {fbmo["model"]} ({sum(fbmo["model"].values())}, {sum(fbmo["model"].values()) / flops_orig_total * 100:.3f}%)\n'
           f'\tin: {fbmo["model.input_layer"]}\n'
           f'\trnn: {fbmo["model.rnn"]}\n'
           f'\tout: {fbmo["model.output_layer"]}\n'
           f'extractor: {fbmo["extractor"]} ({sum(fbmo["extractor"].values())}, {sum(fbmo["extractor"].values()) / flops_orig_total * 100:.3f}%)')
 
+    params_model = sum([param.numel() 
+                        for param in model_orig.model.parameters()])
+    params_extractor = sum([param.numel() 
+                            for param in model_orig.extractor.parameters()])
+    print(f'total parameters {params_model + params_extractor}: '
+          f'model {params_model}, extractor {params_extractor}')
+    
 
 if __name__ == "__main__":
 
