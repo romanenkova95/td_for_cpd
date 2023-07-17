@@ -1,0 +1,53 @@
+rnn_block_type: tcl3d
+data_dim: [192, 8, 8]
+emb_dims: ${core_model.data_dim}
+hidden_dims: [64, 4, 4]
+ranks_input: ${core_model.data_dim}
+ranks_output: [32, 8, 8]
+ranks_rnn: [32, 8, 8]
+fc_bias: -1 
+rnn_bias: -1
+
+model_name: tda_lstm
+
+model_description: 
+  _target_: src.models.components.core_models.BceRNNTl
+  input_block:
+    _target_: src.models.components.base_cells.CoreBlock
+    block_type: "identity"
+    input_dims: ${core_model.data_dim}
+    hidden_dims: ${core_model.emb_dims}
+    ranks: ${core_model.ranks_input}
+    bias_rank: ${core_model.fc_bias}
+    normalize: both
+    block_place: input
+
+  rnn_block:
+    _target_: src.models.components.base_cells.LstmTl
+    input_layer: 
+      _target_: src.models.components.base_cells.CoreBlock
+      block_type: ${core_model.rnn_block_type}
+      input_dims: ${core_model.emb_dims}
+      hidden_dims: ${core_model.hidden_dims}
+      ranks: ${core_model.ranks_rnn}
+      bias_rank: ${core_model.rnn_bias}
+      normalize: both
+    hidden_layer: 
+      _target_: src.models.components.base_cells.CoreBlock
+      block_type: ${core_model.rnn_block_type}
+      input_dims: ${core_model.hidden_dims}
+      hidden_dims: ${core_model.hidden_dims}
+      ranks: ${core_model.ranks_rnn}
+      bias_rank: ${core_model.rnn_bias} 
+      normalize: both
+    batch_first: True
+        
+  output_block:
+    _target_: src.models.components.base_cells.CoreBlock
+    block_type: ${core_model.rnn_block_type}
+    input_dims: ${core_model.hidden_dims}
+    hidden_dims: [1, 1, 1]
+    ranks: ${core_model.ranks_output}
+    bias_rank: ${core_model.fc_bias}
+    normalize: in
+    block_place: output
